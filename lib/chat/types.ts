@@ -1,5 +1,9 @@
 import type { UIMessage } from "ai";
-import type { ExtractInvoiceResult } from "@/lib/invoices/types";
+import type {
+  ExtractInvoiceResult,
+  QueryInvoicesInput,
+  QueryInvoicesResult,
+} from "@/lib/invoices/types";
 
 export type ConversationSummary = {
   id: string;
@@ -11,6 +15,10 @@ export type InvoiceAssistantTools = {
   extractInvoice: {
     input: { documentId: string };
     output: ExtractInvoiceResult;
+  };
+  queryInvoices: {
+    input: QueryInvoicesInput;
+    output: QueryInvoicesResult;
   };
 };
 

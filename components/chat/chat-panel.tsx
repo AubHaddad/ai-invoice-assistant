@@ -23,6 +23,7 @@ import remarkGfm from "remark-gfm";
 import { ComposerUploads } from "@/components/chat/composer-uploads";
 import { useComposerUploads } from "@/components/chat/use-composer-uploads";
 import { InvoiceCard } from "@/components/chat/invoice-card";
+import { InvoiceQueryCard } from "@/components/chat/invoice-query-card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import type { InvoiceAssistantUIMessage } from "@/lib/chat/types";
@@ -147,6 +148,36 @@ function ExtractInvoicePart({
       return (
         <p className="text-sm text-destructive">
           {part.errorText || "Extraction failed."}
+        </p>
+      );
+    default:
+      return null;
+  }
+}
+
+function QueryInvoicesPart({
+  part,
+}: {
+  part: Extract<
+    InvoiceAssistantUIMessage["parts"][number],
+    { type: "tool-queryInvoices" }
+  >;
+}) {
+  switch (part.state) {
+    case "input-streaming":
+    case "input-available":
+      return (
+        <div className="inline-flex items-center gap-2 text-sm text-muted-foreground">
+          <Loader2Icon className="size-4 animate-spin" />
+          Searching invoices…
+        </div>
+      );
+    case "output-available":
+      return <InvoiceQueryCard result={part.output} />;
+    case "output-error":
+      return (
+        <p className="text-sm text-destructive">
+          {part.errorText || "Could not search invoices."}
         </p>
       );
     default:
@@ -352,7 +383,8 @@ export function ChatPanel({
             const hasContent = message.parts.some(
               (part) =>
                 (part.type === "text" && part.text) ||
-                part.type === "tool-extractInvoice",
+                part.type === "tool-extractInvoice" ||
+                part.type === "tool-queryInvoices",
             );
 
             return (
@@ -382,6 +414,14 @@ export function ChatPanel({
                           }
                           onReview={() => openReview(part)}
                         />
+                      </div>
+                    );
+                  }
+
+                  if (part.type === "tool-queryInvoices") {
+                    return (
+                      <div key={part.toolCallId} className="w-full max-w-xl">
+                        <QueryInvoicesPart part={part} />
                       </div>
                     );
                   }

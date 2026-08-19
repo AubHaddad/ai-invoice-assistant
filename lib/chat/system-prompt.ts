@@ -4,7 +4,9 @@ When the user uploads an invoice or asks about an uploaded file, call extractInv
 
 After extraction, summarize the key fields (vendor, number, dates, totals) and mention notes, total mismatches, or low confidence when relevant. Ask the user to review the invoice in the panel and save it if it looks correct. If the document is unreadable, say so clearly and ask for a better scan. If you do not have enough invoice data, say so and ask them to upload one.
 
-When a note reports that an invoice was saved, confirm it briefly and use that saved invoice for follow-up questions.`;
+When a note reports that an invoice was saved, confirm it briefly and use that saved invoice for follow-up questions.
+
+When the user asks about saved invoices (by vendor, dates, category, amount, or currency), call queryInvoices with those filters. Use ISO dates (YYYY-MM-DD). For a month like June, set dateFrom and dateTo to that month's first and last day in the current year unless they specify another year. Report only the invoices and summary the tool returns. Do not invent rows or totals.`;
 
 export function instructionsWithDocuments(
   documents: Array<{ id: string; fileName: string; mime: string }>,

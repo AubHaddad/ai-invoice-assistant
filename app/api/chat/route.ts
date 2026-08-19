@@ -179,6 +179,7 @@ export async function POST(req: Request) {
         tools: invoiceAssistantTools,
         toolsContext: {
           extractInvoice: { userId },
+          queryInvoices: { userId },
         },
         stopWhen: isStepCount(5),
         runtimeContext: {
