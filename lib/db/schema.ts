@@ -1,3 +1,4 @@
+import type { AdapterAccountType } from "next-auth/adapters";
 import {
   date,
   index,
@@ -62,10 +63,34 @@ export type MessageContent = MessagePart[];
 export const users = snakeCase.table("users", {
   id: uuid().primaryKey().defaultRandom(),
   email: text().notNull().unique(),
+  emailVerified: timestamp({ withTimezone: true, mode: "date" }),
   name: text(),
   image: text(),
   createdAt: timestamp({ withTimezone: true }).defaultNow().notNull(),
 });
+
+export const accounts = snakeCase.table(
+  "accounts",
+  {
+    userId: uuid()
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    type: text().$type<AdapterAccountType>().notNull(),
+    provider: text().notNull(),
+    providerAccountId: text().notNull(),
+    refresh_token: text(),
+    access_token: text(),
+    expires_at: integer(),
+    token_type: text(),
+    scope: text(),
+    id_token: text(),
+    session_state: text(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.provider, table.providerAccountId] }),
+    index("accounts_user_id_idx").on(table.userId),
+  ],
+);
 
 export const invoices = snakeCase.table(
   "invoices",
@@ -139,6 +164,8 @@ export const messages = snakeCase.table(
 
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
+export type Account = typeof accounts.$inferSelect;
+export type NewAccount = typeof accounts.$inferInsert;
 export type Invoice = typeof invoices.$inferSelect;
 export type NewInvoice = typeof invoices.$inferInsert;
 export type Conversation = typeof conversations.$inferSelect;

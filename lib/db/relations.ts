@@ -7,6 +7,16 @@ export const relations = defineRelations(schema, (r) => ({
       from: r.users.id,
       to: r.conversations.userId,
     }),
+    accounts: r.many.accounts({
+      from: r.users.id,
+      to: r.accounts.userId,
+    }),
+  },
+  accounts: {
+    user: r.one.users({
+      from: r.accounts.userId,
+      to: r.users.id,
+    }),
   },
   invoices: {
     conversationLinks: r.many.conversationInvoices({
