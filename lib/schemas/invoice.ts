@@ -43,6 +43,11 @@ export const InvoiceSchema = z.object({
 
 /** Extraction-only shape: InvoiceSchema without `raw`, plus model notes. */
 export const InvoiceExtractionSchema = InvoiceSchema.omit({ raw: true }).extend({
+  unreadable: z
+    .boolean()
+    .describe(
+      "True if the document is blank, too blurry, or otherwise unreadable. Do not invent invoice data in that case.",
+    ),
   notes: z
     .string()
     .describe(

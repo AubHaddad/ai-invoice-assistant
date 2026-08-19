@@ -33,6 +33,17 @@ export function InvoiceExtractionCard({
   result: ExtractInvoiceResult;
 }) {
   if (!result.ok) {
+    if (result.code === "unreadable") {
+      return (
+        <Card size="sm" className="bg-destructive/5 shadow-none ring-destructive/20">
+          <CardHeader>
+            <CardTitle>Unreadable document</CardTitle>
+            <CardDescription>{result.error}</CardDescription>
+          </CardHeader>
+        </Card>
+      );
+    }
+
     return (
       <Card size="sm" className="bg-destructive/5 shadow-none ring-destructive/20">
         <CardHeader>
@@ -124,12 +135,24 @@ export function InvoiceExtractionCard({
             {confidencePct}% confident
           </span>
           <span>
-            {extractionPath === "text" ? "Text layer" : "Vision"} · {fileName}
+            {extractionPath === "text"
+              ? "Text layer"
+              : extractionPath === "mixed"
+                ? "Text + vision"
+                : "Vision"}{" "}
+            · {fileName}
           </span>
         </div>
 
         {notes.trim() ? (
-          <p className="rounded-xl bg-muted/80 px-3 py-2 text-sm text-muted-foreground">
+          <p
+            className={cn(
+              "rounded-xl px-3 py-2 text-sm",
+              notes.includes("does not match total")
+                ? "bg-amber-500/10 text-amber-800 dark:text-amber-400"
+                : "bg-muted/80 text-muted-foreground",
+            )}
+          >
             {notes}
           </p>
         ) : null}
