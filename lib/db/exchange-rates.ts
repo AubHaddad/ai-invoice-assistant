@@ -8,12 +8,27 @@ import {
   todayIsoDate,
   type ConvertCurrencyInput,
   type ConvertCurrencyResult,
+  type ExchangeRateQuote,
 } from "@/lib/money/convert";
 import {
   isSupportedCurrency,
   normalizeCurrency,
   SUPPORTED_CURRENCIES,
 } from "@/lib/money/currencies";
+
+export async function loadExchangeRatesOnOrBefore(
+  asOfDate: string,
+): Promise<ExchangeRateQuote[]> {
+  return db
+    .select({
+      fromCurrency: exchangeRates.fromCurrency,
+      toCurrency: exchangeRates.toCurrency,
+      rate: exchangeRates.rate,
+      effectiveDate: exchangeRates.effectiveDate,
+    })
+    .from(exchangeRates)
+    .where(lte(exchangeRates.effectiveDate, asOfDate));
+}
 
 export async function convertCurrencyFromDb(
   input: ConvertCurrencyInput,

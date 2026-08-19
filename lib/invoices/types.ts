@@ -133,38 +133,49 @@ export const QueryInvoicesResultSchema = z.object({
 export type QueriedInvoice = z.infer<typeof QueriedInvoiceSchema>;
 export type QueryInvoicesResult = z.infer<typeof QueryInvoicesResultSchema>;
 
-export const ReportGroupBySchema = z.enum(["category", "month", "vendor"]);
+export const ReportPeriodSchema = z.enum(["month", "quarter", "year"]);
+
+export type ReportPeriod = z.infer<typeof ReportPeriodSchema>;
+
+export const ReportGroupBySchema = z.enum(["category", "vendor"]);
 
 export type ReportGroupBy = z.infer<typeof ReportGroupBySchema>;
 
-export const GenerateReportInputSchema = QueryInvoicesInputSchema.omit({
-  limit: true,
-}).extend({
-  groupBy: ReportGroupBySchema.default("category").describe(
-    "How to group spend: category, calendar month (YYYY-MM), or vendor",
+export const GenerateReportInputSchema = z.object({
+  period: ReportPeriodSchema.describe(
+    "Current calendar window: this month, this quarter, or this year",
   ),
+  groupBy: ReportGroupBySchema.default("category").describe(
+    "How to break down spend: category or vendor",
+  ),
+  currency: z
+    .enum(["MAD", "EUR", "USD"])
+    .optional()
+    .describe(
+      "Convert all amounts to this currency (MAD, EUR, or USD). Defaults to the most common invoice currency in the period.",
+    ),
 });
 
 export type GenerateReportInput = z.infer<typeof GenerateReportInputSchema>;
 
-export const ReportPointSchema = z.object({
+export const ReportRowSchema = z.object({
+  key: z.string(),
   label: z.string(),
   amount: z.number(),
   count: z.number(),
-  currency: z.string(),
 });
 
 export const GenerateReportResultSchema = z.object({
+  period: ReportPeriodSchema,
   groupBy: ReportGroupBySchema,
-  points: z.array(ReportPointSchema),
-  summary: z.object({
-    count: z.number(),
-    sum: z.number(),
-    currency: z.string().nullable(),
-  }),
+  dateFrom: z.iso.date(),
+  dateTo: z.iso.date(),
+  rows: z.array(ReportRowSchema),
+  total: z.number(),
+  currency: z.string(),
 });
 
-export type ReportPoint = z.infer<typeof ReportPointSchema>;
+export type ReportRow = z.infer<typeof ReportRowSchema>;
 export type GenerateReportResult = z.infer<typeof GenerateReportResultSchema>;
 
 export { DEFAULT_QUERY_LIMIT, MAX_QUERY_LIMIT };

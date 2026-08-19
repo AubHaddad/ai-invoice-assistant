@@ -63,15 +63,13 @@ const queryResult: QueryInvoicesResult = {
 };
 
 const reportResult: GenerateReportResult = {
+  period: "month",
   groupBy: "category",
-  points: [
-    { label: "Software", amount: 220, count: 1, currency: "USD" },
-  ],
-  summary: {
-    count: 1,
-    sum: 220,
-    currency: "USD",
-  },
+  dateFrom: "2026-08-01",
+  dateTo: "2026-08-31",
+  rows: [{ key: "software", label: "Software", amount: 1320, count: 1 }],
+  total: 1320,
+  currency: "USD",
 };
 
 describe("tool UI fallbacks", () => {
@@ -96,7 +94,7 @@ describe("tool UI fallbacks", () => {
   });
 
   it("degrades a broken generateReport payload to text", () => {
-    expect(generateReportFallback({ points: "bad" })).toBe(BROKEN_PAYLOAD_TEXT);
+    expect(generateReportFallback({ rows: "bad" })).toBe(BROKEN_PAYLOAD_TEXT);
     expect(generateReportFallback({ groupBy: "category" })).toBe(
       BROKEN_PAYLOAD_TEXT,
     );

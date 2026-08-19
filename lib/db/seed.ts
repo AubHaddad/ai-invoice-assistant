@@ -1,17 +1,9 @@
 import "dotenv/config";
 import { drizzle } from "drizzle-orm/node-postgres";
-import { eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { InvoiceSchema, type Invoice } from "@/lib/schemas";
 import { invoiceInsertValues, lineItemInsertValues } from "./invoices";
-import {
-  conversationInvoices,
-  conversations,
-  documents,
-  invoices,
-  lineItems,
-  messages,
-  users,
-} from "./schema";
+import { documents, invoices, lineItems, users } from "./schema";
 
 const databaseUrl = process.env.DATABASE_URL;
 
@@ -21,7 +13,7 @@ if (!databaseUrl) {
 
 const db = drizzle(databaseUrl);
 
-const DEMO_EMAIL = "ada@invoice-assistant.dev";
+const SEED_EMAIL = "aub.haddad@gmail.com";
 
 const SEEDED_INVOICES: Array<Invoice & { fileName: string; gcsPath: string }> = [
   {
@@ -116,6 +108,262 @@ const SEEDED_INVOICES: Array<Invoice & { fileName: string; gcsPath: string }> = 
       },
     ],
   },
+  {
+    fileName: "ram-inv-3108.pdf",
+    gcsPath: "seed/ram-inv-3108.pdf",
+    vendor: "Royal Air Maroc",
+    invoiceNumber: "INV-3108",
+    issueDate: "2026-08-05",
+    dueDate: "2026-08-20",
+    currency: "MAD",
+    subtotal: 3800,
+    tax: 760,
+    total: 4560,
+    category: "travel",
+    confidence: 0.94,
+    raw: { vendorName: "Royal Air Maroc", invoiceNumber: "INV-3108" },
+    lineItems: [
+      {
+        description: "Round-trip CMN-CDG — August",
+        quantity: 1,
+        unitPrice: 3800,
+        amount: 3800,
+      },
+    ],
+  },
+  {
+    fileName: "marriott-inv-3107.pdf",
+    gcsPath: "seed/marriott-inv-3107.pdf",
+    vendor: "Marriott",
+    invoiceNumber: "INV-3107",
+    issueDate: "2026-07-22",
+    dueDate: "2026-08-05",
+    currency: "EUR",
+    subtotal: 540,
+    tax: 108,
+    total: 648,
+    category: "travel",
+    confidence: 0.93,
+    raw: { vendorName: "Marriott", invoiceNumber: "INV-3107" },
+    lineItems: [
+      {
+        description: "Hotel stay 3 nights, Paris",
+        quantity: 3,
+        unitPrice: 180,
+        amount: 540,
+      },
+    ],
+  },
+  {
+    fileName: "cafe-clock-inv-4081.pdf",
+    gcsPath: "seed/cafe-clock-inv-4081.pdf",
+    vendor: "Cafe Clock",
+    invoiceNumber: "INV-4081",
+    issueDate: "2026-08-08",
+    dueDate: null,
+    currency: "MAD",
+    subtotal: 800,
+    tax: 80,
+    total: 880,
+    category: "meals",
+    confidence: 0.91,
+    raw: { vendorName: "Cafe Clock", invoiceNumber: "INV-4081" },
+    lineItems: [
+      {
+        description: "Team lunch for 6 people",
+        quantity: 1,
+        unitPrice: 800,
+        amount: 800,
+      },
+    ],
+  },
+  {
+    fileName: "comptoir-inv-4082.pdf",
+    gcsPath: "seed/comptoir-inv-4082.pdf",
+    vendor: "Restaurant Le Grand Comptoir",
+    invoiceNumber: "INV-4082",
+    issueDate: "2026-07-15",
+    dueDate: null,
+    currency: "EUR",
+    subtotal: 210,
+    tax: 21,
+    total: 231,
+    category: "meals",
+    confidence: 0.9,
+    raw: {
+      vendorName: "Restaurant Le Grand Comptoir",
+      invoiceNumber: "INV-4082",
+    },
+    lineItems: [
+      {
+        description: "Client dinner",
+        quantity: 1,
+        unitPrice: 210,
+        amount: 210,
+      },
+    ],
+  },
+  {
+    fileName: "ikea-inv-5110.pdf",
+    gcsPath: "seed/ikea-inv-5110.pdf",
+    vendor: "IKEA",
+    invoiceNumber: "INV-5110",
+    issueDate: "2026-08-11",
+    dueDate: "2026-08-25",
+    currency: "EUR",
+    subtotal: 350,
+    tax: 70,
+    total: 420,
+    category: "office",
+    confidence: 0.95,
+    raw: { vendorName: "IKEA", invoiceNumber: "INV-5110" },
+    lineItems: [
+      {
+        description: "Standing desk and office chair",
+        quantity: 1,
+        unitPrice: 350,
+        amount: 350,
+      },
+    ],
+  },
+  {
+    fileName: "staples-inv-5111.pdf",
+    gcsPath: "seed/staples-inv-5111.pdf",
+    vendor: "Staples",
+    invoiceNumber: "INV-5111",
+    issueDate: "2026-06-20",
+    dueDate: "2026-07-04",
+    currency: "USD",
+    subtotal: 86,
+    tax: 8.6,
+    total: 94.6,
+    category: "office",
+    confidence: 0.92,
+    raw: { vendorName: "Staples", invoiceNumber: "INV-5111" },
+    lineItems: [
+      {
+        description: "Printer paper, pens, and toner",
+        quantity: 1,
+        unitPrice: 86,
+        amount: 86,
+      },
+    ],
+  },
+  {
+    fileName: "iam-inv-6201.pdf",
+    gcsPath: "seed/iam-inv-6201.pdf",
+    vendor: "Maroc Telecom",
+    invoiceNumber: "INV-6201",
+    issueDate: "2026-08-03",
+    dueDate: "2026-08-18",
+    currency: "MAD",
+    subtotal: 500,
+    tax: 100,
+    total: 600,
+    category: "telecom",
+    confidence: 0.97,
+    raw: { vendorName: "Maroc Telecom", invoiceNumber: "INV-6201" },
+    lineItems: [
+      {
+        description: "Monthly fiber internet — August",
+        quantity: 1,
+        unitPrice: 500,
+        amount: 500,
+      },
+    ],
+  },
+  {
+    fileName: "orange-inv-6202.pdf",
+    gcsPath: "seed/orange-inv-6202.pdf",
+    vendor: "Orange",
+    invoiceNumber: "INV-6202",
+    issueDate: "2026-07-03",
+    dueDate: "2026-07-18",
+    currency: "MAD",
+    subtotal: 249,
+    tax: 49.8,
+    total: 298.8,
+    category: "telecom",
+    confidence: 0.96,
+    raw: { vendorName: "Orange", invoiceNumber: "INV-6202" },
+    lineItems: [
+      {
+        description: "Mobile plan for the team — July",
+        quantity: 1,
+        unitPrice: 249,
+        amount: 249,
+      },
+    ],
+  },
+  {
+    fileName: "google-ads-inv-7304.pdf",
+    gcsPath: "seed/google-ads-inv-7304.pdf",
+    vendor: "Google",
+    invoiceNumber: "INV-7304",
+    issueDate: "2026-08-14",
+    dueDate: "2026-09-13",
+    currency: "USD",
+    subtotal: 450,
+    tax: 0,
+    total: 450,
+    category: "marketing",
+    confidence: 0.95,
+    raw: { vendorName: "Google", invoiceNumber: "INV-7304" },
+    lineItems: [
+      {
+        description: "Google Ads campaign — August",
+        quantity: 1,
+        unitPrice: 450,
+        amount: 450,
+      },
+    ],
+  },
+  {
+    fileName: "linkedin-inv-7305.pdf",
+    gcsPath: "seed/linkedin-inv-7305.pdf",
+    vendor: "LinkedIn",
+    invoiceNumber: "INV-7305",
+    issueDate: "2026-05-12",
+    dueDate: "2026-06-11",
+    currency: "USD",
+    subtotal: 280,
+    tax: 0,
+    total: 280,
+    category: "marketing",
+    confidence: 0.94,
+    raw: { vendorName: "LinkedIn", invoiceNumber: "INV-7305" },
+    lineItems: [
+      {
+        description: "Sponsored job posts — May",
+        quantity: 1,
+        unitPrice: 280,
+        amount: 280,
+      },
+    ],
+  },
+  {
+    fileName: "benani-inv-8401.pdf",
+    gcsPath: "seed/benani-inv-8401.pdf",
+    vendor: "Benani & Associates",
+    invoiceNumber: "INV-8401",
+    issueDate: "2026-08-18",
+    dueDate: "2026-09-17",
+    currency: "MAD",
+    subtotal: 3000,
+    tax: 600,
+    total: 3600,
+    category: "other",
+    confidence: 0.92,
+    raw: { vendorName: "Benani & Associates", invoiceNumber: "INV-8401" },
+    lineItems: [
+      {
+        description: "Legal retainer for contract review",
+        quantity: 1,
+        unitPrice: 3000,
+        amount: 3000,
+      },
+    ],
+  },
 ];
 
 async function insertInvoice(
@@ -154,16 +402,27 @@ async function insertInvoice(
 }
 
 async function seed() {
-  await db.delete(users).where(eq(users.email, DEMO_EMAIL));
-
   const [user] = await db
-    .insert(users)
-    .values({
-      email: DEMO_EMAIL,
-      name: "Ada Lovelace",
-      image: "https://api.dicebear.com/9.x/initials/svg?seed=Ada%20Lovelace",
-    })
-    .returning();
+    .select()
+    .from(users)
+    .where(eq(users.email, SEED_EMAIL))
+    .limit(1);
+
+  if (!user) {
+    throw new Error(
+      `No user found for ${SEED_EMAIL}. Sign in once, then re-run the seed.`,
+    );
+  }
+
+  await db.delete(documents).where(
+    and(
+      eq(documents.userId, user.id),
+      inArray(
+        documents.gcsPath,
+        SEEDED_INVOICES.map((invoice) => invoice.gcsPath),
+      ),
+    ),
+  );
 
   const seeded = [];
 
@@ -171,84 +430,13 @@ async function seed() {
     seeded.push(await insertInvoice(user.id, invoiceSeed));
   }
 
-  const acme = seeded.find(
-    (row) => row.invoice.invoiceNumber === "INV-1042",
-  );
-
-  if (!acme) {
-    throw new Error("Expected Acme invoice in seed data");
-  }
-
-  const [conversation] = await db
-    .insert(conversations)
-    .values({
-      userId: user.id,
-      title: "Acme invoice tax",
-    })
-    .returning();
-
-  await db.insert(conversationInvoices).values({
-    conversationId: conversation.id,
-    invoiceId: acme.invoice.id,
-  });
-
-  await db.insert(messages).values([
-    {
-      conversationId: conversation.id,
-      role: "user",
-      content: [
-        { type: "text", text: "What's the tax on the Acme invoice?" },
-      ],
-    },
-    {
-      conversationId: conversation.id,
-      role: "assistant",
-      content: [
-        { type: "text", text: "I'll look that up from the extracted invoice." },
-        {
-          type: "tool-call",
-          toolCallId: "call_tax_1",
-          toolName: "get_invoice_totals",
-          args: { invoiceNumber: "INV-1042" },
-        },
-      ],
-      tokensIn: 48,
-      tokensOut: 22,
-    },
-    {
-      conversationId: conversation.id,
-      role: "tool",
-      content: [
-        {
-          type: "tool-result",
-          toolCallId: "call_tax_1",
-          toolName: "get_invoice_totals",
-          result: { tax: 120, total: 1320, currency: "USD" },
-        },
-      ],
-    },
-    {
-      conversationId: conversation.id,
-      role: "assistant",
-      content: [
-        {
-          type: "text",
-          text: "The Acme invoice (INV-1042) has $120.00 tax, for a total of $1,320.00.",
-        },
-      ],
-      tokensIn: 96,
-      tokensOut: 34,
-    },
-  ]);
-
-  console.log("Seeded demo data:");
+  console.log("Seeded demo invoices:");
   console.log(`  user:          ${user.email}`);
   for (const row of seeded) {
     console.log(
       `  invoice:       ${row.invoice.invoiceNumber} ${row.invoice.vendor} ${row.invoice.total} ${row.invoice.currency} (${row.invoice.issueDate})`,
     );
   }
-  console.log(`  conversation:  ${conversation.title}`);
 }
 
 seed()

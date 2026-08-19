@@ -8,7 +8,7 @@ import {
 
 export const generateReportTool = tool({
   description:
-    "Build a spending breakdown for a chart, grouped by category, calendar month, or vendor. Use this when the user asks for spend by category, over time, or by vendor, or wants a report or chart. Apply the same invoice filters as queryInvoices. Do not invent series — only report the groups this tool returns. Mixed currencies are split into separate points and are not added together. The tool is already scoped to the signed-in user.",
+    "Build a spending report for a chart. period is the current calendar month, quarter, or year. groupBy is category or vendor. Optional currency converts every amount to MAD, EUR, or USD; otherwise the most common invoice currency in the period is used. Totals are aggregated in SQL and converted to one currency. Use this for monthly/quarterly/yearly reports or spend charts (e.g. “Give me my monthly report by category”). Report only the rows and total this tool returns. Already scoped to the signed-in user.",
   inputSchema: GenerateReportInputSchema,
   contextSchema: z.object({
     userId: z.string(),

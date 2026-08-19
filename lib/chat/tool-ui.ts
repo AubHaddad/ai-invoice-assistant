@@ -6,6 +6,11 @@ import {
   type GenerateReportResult,
   type QueryInvoicesResult,
 } from "@/lib/invoices/types";
+import {
+  invoiceCount,
+  REPORT_GROUP_LABELS,
+  REPORT_PERIOD_LABELS,
+} from "@/lib/invoices/report-utils";
 import { formatMoney } from "@/lib/money/format";
 
 export const BROKEN_PAYLOAD_TEXT = "This result could not be displayed.";
@@ -80,15 +85,21 @@ export function generateReportFallback(output: unknown) {
 }
 
 export function formatGenerateReport(result: GenerateReportResult) {
-  if (result.points.length === 0) {
-    return "No spending data.";
+  const count = invoiceCount(result.rows);
+  const total = formatMoney(result.total, result.currency);
+  const header = `${REPORT_PERIOD_LABELS[result.period]} report by ${REPORT_GROUP_LABELS[result.groupBy]} totaling ${total}`;
+
+  if (result.rows.length === 0) {
+    return `${header}. No spending data.`;
   }
 
-  const header = `${result.summary.count} invoice${result.summary.count === 1 ? "" : "s"} totaling ${formatMoney(result.summary.sum, result.summary.currency)} by ${result.groupBy}`;
-  const rows = result.points.map(
-    (point) =>
-      `${point.label}: ${formatMoney(point.amount, point.currency)} (${point.count})`,
+  const rows = result.rows.map(
+    (row) =>
+      `${row.label}: ${formatMoney(row.amount, result.currency)} (${row.count})`,
   );
 
-  return [header, ...rows].join("\n");
+  return [
+    `${header} · ${count} invoice${count === 1 ? "" : "s"}`,
+    ...rows,
+  ].join("\n");
 }

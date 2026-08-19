@@ -1,13 +1,15 @@
-import { count, sql, sum } from "drizzle-orm";
+import { and, count, eq, gte, lte, sql, sum } from "drizzle-orm";
 import "server-only";
 import { db } from "@/lib/db";
+import { loadExchangeRatesOnOrBefore } from "@/lib/db/exchange-rates";
 import { invoices } from "@/lib/db/schema";
+import { todayIsoDate } from "@/lib/money/convert";
+import { roundMoney } from "@/lib/money/precision";
 import {
-  EXPENSE_CATEGORY_LABELS,
-  parseExpenseCategory,
-} from "./categories";
-import { roundMoney } from "./postprocess";
-import { invoiceWhere } from "./query";
+  buildReportResult,
+  conversionAsOfDate,
+  periodRange,
+} from "./report-utils";
 import {
   GenerateReportInputSchema,
   type GenerateReportInput,
@@ -27,37 +29,20 @@ function toNumber(value: string | number | null | undefined) {
   return Number.isFinite(parsed) ? roundMoney(parsed) : 0;
 }
 
-function pointLabel(groupBy: ReportGroupBy, key: string) {
-  if (groupBy === "category") {
-    const category = parseExpenseCategory(key);
-    return category ? EXPENSE_CATEGORY_LABELS[category] : "Uncategorized";
-  }
-
-  return key;
-}
-
 async function loadReportGroups(
   userId: string,
-  input: GenerateReportInput,
+  groupBy: ReportGroupBy,
+  dateFrom: string,
+  dateTo: string,
 ) {
-  const where = invoiceWhere(userId, input);
+  const where = and(
+    eq(invoices.userId, userId),
+    gte(invoices.issueDate, dateFrom),
+    lte(invoices.issueDate, dateTo),
+  );
 
-  if (input.groupBy === "month") {
-    const month = sql<string>`to_char(${invoices.issueDate}::date, 'YYYY-MM')`;
-    return db
-      .select({
-        key: month,
-        currency: invoices.currency,
-        count: count(),
-        sum: sum(invoices.total),
-      })
-      .from(invoices)
-      .where(where)
-      .groupBy(month, invoices.currency);
-  }
-
-  if (input.groupBy === "vendor") {
-    return db
+  if (groupBy === "vendor") {
+    const rows = await db
       .select({
         key: invoices.vendor,
         currency: invoices.currency,
@@ -67,10 +52,17 @@ async function loadReportGroups(
       .from(invoices)
       .where(where)
       .groupBy(invoices.vendor, invoices.currency);
+
+    return rows.map((row) => ({
+      key: row.key,
+      currency: row.currency,
+      count: row.count,
+      sum: toNumber(row.sum),
+    }));
   }
 
   const category = sql<string>`coalesce(${invoices.category}, 'uncategorized')`;
-  return db
+  const rows = await db
     .select({
       key: category,
       currency: invoices.currency,
@@ -80,55 +72,44 @@ async function loadReportGroups(
     .from(invoices)
     .where(where)
     .groupBy(category, invoices.currency);
+
+  return rows.map((row) => ({
+    key: row.key,
+    currency: row.currency,
+    count: row.count,
+    sum: toNumber(row.sum),
+  }));
 }
 
 export async function generateReport({
   userId,
   filters,
+  now = new Date(),
 }: {
   userId: string;
   filters: GenerateReportInput;
+  now?: Date;
 }): Promise<GenerateReportResult> {
   const input = GenerateReportInputSchema.parse(filters);
-  const rows = await loadReportGroups(userId, input);
-  const currencies = new Set(rows.map((row) => row.currency));
-  const mixedCurrencies = currencies.size > 1;
+  const today = todayIsoDate(now);
+  const { dateFrom, dateTo } = periodRange(input.period, today);
+  const asOfDate = conversionAsOfDate(dateTo, today);
+  const [groups, rates] = await Promise.all([
+    loadReportGroups(userId, input.groupBy, dateFrom, dateTo),
+    loadExchangeRatesOnOrBefore(asOfDate),
+  ]);
+  const built = buildReportResult({
+    input,
+    dateFrom,
+    dateTo,
+    groups,
+    rates,
+    asOfDate,
+  });
 
-  const points = rows
-    .map((row) => {
-      const baseLabel = pointLabel(input.groupBy, row.key);
-      return {
-        key: row.key,
-        label: mixedCurrencies ? `${baseLabel} · ${row.currency}` : baseLabel,
-        amount: toNumber(row.sum),
-        count: row.count,
-        currency: row.currency,
-      };
-    })
-    .sort((left, right) => {
-      if (input.groupBy === "month") {
-        return (
-          left.key.localeCompare(right.key) ||
-          left.currency.localeCompare(right.currency)
-        );
-      }
+  if (!built.ok) {
+    throw new Error(built.error);
+  }
 
-      return right.amount - left.amount;
-    })
-    .map((point) => ({
-      label: point.label,
-      amount: point.amount,
-      count: point.count,
-      currency: point.currency,
-    }));
-
-  return {
-    groupBy: input.groupBy,
-    points,
-    summary: {
-      count: rows.reduce((total, row) => total + row.count, 0),
-      sum: roundMoney(rows.reduce((total, row) => total + toNumber(row.sum), 0)),
-      currency: currencies.size === 1 ? rows[0].currency : null,
-    },
-  };
+  return built.report;
 }
