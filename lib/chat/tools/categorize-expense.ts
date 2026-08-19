@@ -1,5 +1,6 @@
 import { tool } from "ai";
 import "server-only";
+import { ANTHROPIC_CACHE_CONTROL } from "@/lib/ai/cache";
 import { executeTool } from "@/lib/chat/safe-tool";
 import { categorizeExpense } from "@/lib/invoices/categorize";
 import { CategorizeExpenseInputSchema } from "@/lib/invoices/categories";
@@ -8,6 +9,7 @@ export const categorizeExpenseTool = tool({
   description:
     "Classify a business expense into a fixed category: software, travel, meals, office, telecom, marketing, or other. Pass a short description (line items or what was billed) and the vendor. Always call this instead of inventing a category. The result is always one of those seven values.",
   inputSchema: CategorizeExpenseInputSchema,
+  providerOptions: ANTHROPIC_CACHE_CONTROL,
   execute: async (input, { abortSignal }) => {
     return executeTool("categorizeExpense", () =>
       categorizeExpense(input, { abortSignal }),

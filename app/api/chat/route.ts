@@ -9,13 +9,15 @@ import {
 } from "ai";
 import { propagateAttributes } from "@langfuse/tracing";
 import { after } from "next/server";
-import { getModel } from "@/lib/ai/models";
+import { getModel, getPrimaryModelId } from "@/lib/ai/models";
+import { computeMessageCost } from "@/lib/ai/pricing";
 import { getCurrentUserId } from "@/lib/auth/session";
 import {
   DEFAULT_CHAT_ERROR_MESSAGE,
   toPublicErrorMessage,
 } from "@/lib/chat/error-message";
 import { logAgentStepToLangfuse } from "@/lib/chat/log-step";
+import { logMessageUsageToLangfuse } from "@/lib/chat/log-usage";
 import {
   AGENT_TIMEOUT,
   MAX_AGENT_STEPS,
@@ -28,7 +30,11 @@ import {
   saveSystemMessage,
   saveUserMessage,
 } from "@/lib/chat/store";
-import { instructionsWithContext, instructionsWithDocuments } from "@/lib/chat/system-prompt";
+import {
+  cachedChatInstructions,
+  conversationContextMessage,
+  systemInstructionsText,
+} from "@/lib/chat/system-prompt";
 import { invoiceAssistantTools } from "@/lib/chat/tools";
 import { truncateMessages } from "@/lib/chat/truncate";
 import { getMessageText } from "@/lib/chat/ui-message";
@@ -46,21 +52,6 @@ import {
 } from "@/lib/rate-limit";
 
 export const maxDuration = 60;
-
-function toTokenCount(value: number | undefined) {
-  if (typeof value !== "number" || !Number.isFinite(value) || value < 0) {
-    return undefined;
-  }
-
-  return Math.trunc(value);
-}
-
-function tokenCountsFromUsage(usage: LanguageModelUsage | undefined) {
-  return {
-    tokensIn: toTokenCount(usage?.inputTokens),
-    tokensOut: toTokenCount(usage?.outputTokens),
-  };
-}
 
 function failureResponse(error: unknown, extra?: Record<string, unknown>) {
   logFailureToLangfuse({
@@ -166,9 +157,11 @@ export async function POST(req: Request) {
     const conversationMessages = messages.filter(
       (message) => message.role !== "system",
     );
-    const instructions = instructionsWithContext(
-      instructionsWithDocuments(uploadedDocuments),
-      systemNotes,
+    const instructions = cachedChatInstructions(
+      conversationContextMessage({
+        documents: uploadedDocuments,
+        notes: systemNotes,
+      }),
     );
 
     await saveUserMessage({
@@ -187,7 +180,7 @@ export async function POST(req: Request) {
 
     const truncatedMessages = truncateMessages({
       messages: conversationMessages,
-      systemPrompt: instructions,
+      systemPrompt: systemInstructionsText(instructions),
     });
     const modelMessages = [
       ...(await convertToModelMessages(truncatedMessages)),
@@ -213,6 +206,7 @@ export async function POST(req: Request) {
       },
       async () => {
         let usage: LanguageModelUsage | undefined;
+        let modelId = getPrimaryModelId("fast");
 
         const result = streamText({
           model: getModel("fast"),
@@ -251,6 +245,10 @@ export async function POST(req: Request) {
           },
           onEnd: (event) => {
             usage = event.usage;
+            modelId =
+              event.finalStep.model.modelId ||
+              event.response?.modelId ||
+              modelId;
           },
         });
 
@@ -270,15 +268,21 @@ export async function POST(req: Request) {
               const resolvedUsage =
                 usage ??
                 (await Promise.resolve(result.usage).catch(() => undefined));
-              const tokenCounts = tokenCountsFromUsage(resolvedUsage);
-              const tokensUsed =
-                (tokenCounts.tokensIn ?? 0) + (tokenCounts.tokensOut ?? 0);
+              const cost = computeMessageCost({
+                modelId,
+                usage: resolvedUsage,
+              });
+              const tokensUsed = cost.tokensIn + cost.tokensOut;
 
               try {
                 await saveAssistantMessage({
                   conversationId,
                   message: responseMessage,
-                  ...tokenCounts,
+                  tokensIn: cost.tokensIn,
+                  tokensOut: cost.tokensOut,
+                  tokensCached: cost.tokensCached,
+                  tokensCacheWrite: cost.tokensCacheWrite,
+                  costUsd: cost.costUsd,
                   isContinuation,
                 });
               } catch (error) {
@@ -289,6 +293,8 @@ export async function POST(req: Request) {
                   extra: { stage: "save-assistant-message" },
                 });
               }
+
+              logMessageUsageToLangfuse(cost);
 
               if (tokensUsed > 0) {
                 try {

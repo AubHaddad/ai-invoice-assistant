@@ -25,6 +25,22 @@ export type ConversationSummary = {
   updatedAt: string;
 };
 
+export type ConversationUsage = {
+  tokensIn: number;
+  tokensOut: number;
+  tokensCached: number;
+  tokensCacheWrite: number;
+  costUsd: number;
+};
+
+export const EMPTY_CONVERSATION_USAGE: ConversationUsage = {
+  tokensIn: 0,
+  tokensOut: 0,
+  tokensCached: 0,
+  tokensCacheWrite: 0,
+  costUsd: 0,
+};
+
 export type ToolErrorResult = { error: string };
 
 export type InvoiceAssistantTools = {

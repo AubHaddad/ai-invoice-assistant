@@ -7,7 +7,14 @@ export function logAgentStepToLangfuse(step: {
   finishReason: string;
   text?: string;
   toolCalls?: Array<{ toolName: string; toolCallId?: string }>;
-  usage?: { inputTokens?: number; outputTokens?: number };
+  usage?: {
+    inputTokens?: number;
+    outputTokens?: number;
+    inputTokenDetails?: {
+      cacheReadTokens?: number;
+      cacheWriteTokens?: number;
+    };
+  };
   performance?: { stepTimeMs?: number };
 }): AgentStepSummary | undefined {
   const summary = summarizeAgentStep(step);
@@ -28,6 +35,8 @@ export function logAgentStepToLangfuse(step: {
           stepNumber: summary.stepNumber,
           tokensIn: summary.tokensIn,
           tokensOut: summary.tokensOut,
+          cacheReadTokens: summary.tokensCached,
+          cacheWriteTokens: summary.tokensCacheWrite,
           stepTimeMs: summary.stepTimeMs,
           chainedTools: summary.toolNames,
         },

@@ -64,6 +64,8 @@ export type AgentStepSummary = {
   textPreview: string;
   tokensIn: number | undefined;
   tokensOut: number | undefined;
+  tokensCached: number | undefined;
+  tokensCacheWrite: number | undefined;
   stepTimeMs: number | undefined;
 };
 
@@ -74,7 +76,14 @@ export function summarizeAgentStep(step: {
   finishReason: string;
   text?: string;
   toolCalls?: Array<{ toolName: string; toolCallId?: string }>;
-  usage?: { inputTokens?: number; outputTokens?: number };
+  usage?: {
+    inputTokens?: number;
+    outputTokens?: number;
+    inputTokenDetails?: {
+      cacheReadTokens?: number;
+      cacheWriteTokens?: number;
+    };
+  };
   performance?: { stepTimeMs?: number };
 }): AgentStepSummary {
   return {
@@ -89,6 +98,8 @@ export function summarizeAgentStep(step: {
     textPreview: (step.text ?? "").slice(0, TEXT_PREVIEW_CHARS),
     tokensIn: step.usage?.inputTokens,
     tokensOut: step.usage?.outputTokens,
+    tokensCached: step.usage?.inputTokenDetails?.cacheReadTokens,
+    tokensCacheWrite: step.usage?.inputTokenDetails?.cacheWriteTokens,
     stepTimeMs: step.performance?.stepTimeMs,
   };
 }

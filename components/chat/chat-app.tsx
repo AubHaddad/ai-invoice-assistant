@@ -5,9 +5,14 @@ import { useMemo, useState } from "react";
 import { UserMenu } from "@/components/auth/user-menu";
 import { ChatPanel } from "@/components/chat/chat-panel";
 import { ChatSidebar } from "@/components/chat/chat-sidebar";
+import { ConversationCostBadge } from "@/components/chat/cost-badge";
 import { ErrorBoundary } from "@/components/error-boundary";
 import type { InvoiceAssistantUIMessage } from "@/lib/chat/types";
-import type { ConversationSummary } from "@/lib/chat/types";
+import {
+  EMPTY_CONVERSATION_USAGE,
+  type ConversationSummary,
+  type ConversationUsage,
+} from "@/lib/chat/types";
 
 type ChatAppProps = {
   user: {
@@ -18,6 +23,8 @@ type ChatAppProps = {
   conversationId: string;
   initialConversations: ConversationSummary[];
   initialMessages: InvoiceAssistantUIMessage[];
+  initialUsage?: ConversationUsage;
+  showCostBadge?: boolean;
 };
 
 export function ChatApp({
@@ -25,10 +32,15 @@ export function ChatApp({
   conversationId,
   initialConversations,
   initialMessages,
+  initialUsage,
+  showCostBadge = false,
 }: ChatAppProps) {
   const router = useRouter();
   const [conversations, setConversations] =
     useState<ConversationSummary[]>(initialConversations);
+  const [usage, setUsage] = useState<ConversationUsage>(
+    initialUsage ?? EMPTY_CONVERSATION_USAGE,
+  );
 
   const persistedIds = useMemo(
     () => new Set(conversations.map((conversation) => conversation.id)),
@@ -48,6 +60,21 @@ export function ChatApp({
     setConversations(data.conversations);
   }
 
+  async function refreshUsage() {
+    if (!showCostBadge) {
+      return;
+    }
+
+    const response = await fetch(`/api/conversations/${conversationId}/usage`);
+
+    if (!response.ok) {
+      return;
+    }
+
+    const data = (await response.json()) as { usage: ConversationUsage };
+    setUsage(data.usage);
+  }
+
   function startNewChat() {
     router.push(`/${crypto.randomUUID()}`);
   }
@@ -65,9 +92,14 @@ export function ChatApp({
 
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         <header className="flex items-center justify-between gap-4 border-b px-3 py-3 md:px-4">
-          <p className="font-heading truncate text-sm font-medium">
-            Invoice Assistant
-          </p>
+          <div className="flex min-w-0 items-center gap-2">
+            <p className="font-heading truncate text-sm font-medium">
+              Invoice Assistant
+            </p>
+            {showCostBadge ? (
+              <ConversationCostBadge usage={usage} />
+            ) : null}
+          </div>
           <UserMenu user={user} />
         </header>
 
@@ -77,6 +109,7 @@ export function ChatApp({
             initialMessages={initialMessages}
             onConversationUpdated={() => {
               void refreshConversations();
+              void refreshUsage();
             }}
           />
         </ErrorBoundary>

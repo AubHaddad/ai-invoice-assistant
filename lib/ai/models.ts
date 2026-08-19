@@ -76,6 +76,17 @@ function createProviderModel(provider: ModelProvider, modelId: string) {
   }
 }
 
+export function getModelId(provider: ModelProvider, tier: ModelTier) {
+  return readModelId(provider, tier);
+}
+
+export function getPrimaryModelId(tier: ModelTier) {
+  return getModelId(
+    readProvider("AI_PRIMARY_PROVIDER", DEFAULT_PRIMARY_PROVIDER),
+    tier,
+  );
+}
+
 function logProviderFailure(error: unknown, stage: "retry" | "fallback") {
   logFailureToLangfuse({
     source: "provider",

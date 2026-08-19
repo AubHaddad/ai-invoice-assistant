@@ -1,6 +1,7 @@
-import { and, asc, desc, eq } from "drizzle-orm";
+import { and, asc, desc, eq, sum } from "drizzle-orm";
 import type { UIMessage } from "ai";
 import "server-only";
+import { roundCostUsd } from "@/lib/ai/pricing";
 import { db } from "@/lib/db";
 import {
   conversations,
@@ -8,10 +9,12 @@ import {
   type Conversation,
 } from "@/lib/db/schema";
 import { generateConversationTitle } from "./title";
-import type { ConversationSummary } from "./types";
+import type { ConversationSummary, ConversationUsage } from "./types";
+import { EMPTY_CONVERSATION_USAGE } from "./types";
 import { toMessageContent, toUIMessage } from "./ui-message";
 
-export type { ConversationSummary } from "./types";
+export type { ConversationSummary, ConversationUsage } from "./types";
+export { EMPTY_CONVERSATION_USAGE } from "./types";
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -48,6 +51,33 @@ export async function getConversationForUser(id: string, userId: string) {
     .limit(1);
 
   return conversation ?? null;
+}
+
+export async function getConversationUsage(
+  conversationId: string,
+): Promise<ConversationUsage> {
+  const [row] = await db
+    .select({
+      tokensIn: sum(messages.tokensIn),
+      tokensOut: sum(messages.tokensOut),
+      tokensCached: sum(messages.tokensCached),
+      tokensCacheWrite: sum(messages.tokensCacheWrite),
+      costUsd: sum(messages.costUsd),
+    })
+    .from(messages)
+    .where(eq(messages.conversationId, conversationId));
+
+  if (!row) {
+    return EMPTY_CONVERSATION_USAGE;
+  }
+
+  return {
+    tokensIn: Number(row.tokensIn ?? 0) || 0,
+    tokensOut: Number(row.tokensOut ?? 0) || 0,
+    tokensCached: Number(row.tokensCached ?? 0) || 0,
+    tokensCacheWrite: Number(row.tokensCacheWrite ?? 0) || 0,
+    costUsd: roundCostUsd(Number(row.costUsd ?? 0) || 0),
+  };
 }
 
 export async function listConversationMessages(conversationId: string) {
@@ -153,18 +183,27 @@ export async function saveAssistantMessage({
   message,
   tokensIn,
   tokensOut,
+  tokensCached,
+  tokensCacheWrite,
+  costUsd,
   isContinuation,
 }: {
   conversationId: string;
   message: UIMessage;
   tokensIn?: number;
   tokensOut?: number;
+  tokensCached?: number;
+  tokensCacheWrite?: number;
+  costUsd?: number;
   isContinuation: boolean;
 }) {
   const values = {
     content: toMessageContent(message),
     ...(tokensIn != null ? { tokensIn } : {}),
     ...(tokensOut != null ? { tokensOut } : {}),
+    ...(tokensCached != null ? { tokensCached } : {}),
+    ...(tokensCacheWrite != null ? { tokensCacheWrite } : {}),
+    ...(costUsd != null ? { costUsd } : {}),
   };
 
   if (isContinuation) {

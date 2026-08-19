@@ -1,8 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { SYSTEM_PROMPT } from "@/lib/ai/prompts";
 import {
+  cachedChatInstructions,
+  conversationContextMessage,
   instructionsWithContext,
   instructionsWithDocuments,
+  systemInstructionsText,
 } from "./system-prompt";
 
 describe("instructionsWithDocuments", () => {
@@ -34,5 +37,27 @@ describe("instructionsWithContext", () => {
     expect(instructionsWithContext("base", [" Saved. "])).toBe(
       "base\n\nAdditional context:\n- Saved.",
     );
+  });
+});
+
+describe("cachedChatInstructions", () => {
+  it("caches the static system prompt and leaves document context uncached", () => {
+    const extra = conversationContextMessage({
+      documents: [{ id: "doc-1", fileName: "acme.pdf", mime: "application/pdf" }],
+      notes: [],
+    });
+    const instructions = cachedChatInstructions(extra);
+
+    expect(instructions).toHaveLength(2);
+    expect(instructions[0]).toMatchObject({
+      role: "system",
+      content: SYSTEM_PROMPT,
+      providerOptions: {
+        anthropic: { cacheControl: { type: "ephemeral" } },
+      },
+    });
+    expect(instructions[1]).toEqual(extra);
+    expect(instructions[1].providerOptions).toBeUndefined();
+    expect(systemInstructionsText(instructions)).toContain("acme.pdf");
   });
 });

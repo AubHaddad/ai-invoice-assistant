@@ -1,10 +1,9 @@
 import { getCurrentUserId } from "@/lib/auth/session";
 import {
+  EMPTY_CONVERSATION_USAGE,
   getConversationForUser,
   getConversationUsage,
   isUuid,
-  listConversationMessages,
-  toConversationSummary,
 } from "@/lib/chat/store";
 
 export async function GET(
@@ -26,17 +25,10 @@ export async function GET(
   const conversation = await getConversationForUser(id, userId);
 
   if (!conversation) {
-    return Response.json({ error: "Conversation not found" }, { status: 404 });
+    return Response.json({ usage: EMPTY_CONVERSATION_USAGE });
   }
 
-  const [messages, usage] = await Promise.all([
-    listConversationMessages(id),
-    getConversationUsage(id),
-  ]);
+  const usage = await getConversationUsage(id);
 
-  return Response.json({
-    conversation: toConversationSummary(conversation),
-    messages,
-    usage,
-  });
+  return Response.json({ usage });
 }

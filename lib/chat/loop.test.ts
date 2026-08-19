@@ -73,7 +73,31 @@ describe("summarizeAgentStep", () => {
       textPreview: "Converting to EUR",
       tokensIn: 120,
       tokensOut: 40,
+      tokensCached: undefined,
+      tokensCacheWrite: undefined,
       stepTimeMs: 350,
+    });
+  });
+
+  it("includes cached input tokens from usage details", () => {
+    expect(
+      summarizeAgentStep({
+        stepNumber: 0,
+        finishReason: "stop",
+        usage: {
+          inputTokens: 5000,
+          outputTokens: 40,
+          inputTokenDetails: {
+            cacheReadTokens: 4000,
+            cacheWriteTokens: 200,
+          },
+        },
+      }),
+    ).toMatchObject({
+      tokensIn: 5000,
+      tokensOut: 40,
+      tokensCached: 4000,
+      tokensCacheWrite: 200,
     });
   });
 });
