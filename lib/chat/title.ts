@@ -1,8 +1,6 @@
 import { generateText } from "ai";
-import { anthropic } from "@ai-sdk/anthropic";
 import "server-only";
-
-const TITLE_MODEL = anthropic("claude-haiku-4-5");
+import { getModel } from "@/lib/ai/models";
 
 export function fallbackTitle(userText: string) {
   const compact = userText.trim().replace(/\s+/g, " ");
@@ -19,12 +17,22 @@ export async function generateConversationTitle(userText: string) {
 
   try {
     const { text } = await generateText({
-      model: TITLE_MODEL,
+      model: getModel("fast"),
+      maxRetries: 0,
       maxOutputTokens: 24,
       temperature: 0.2,
       instructions:
         "Generate a short conversation title of at most 6 words. No quotes, no trailing punctuation, no extra commentary.",
       prompt: userText.trim().slice(0, 400) || "New chat",
+      runtimeContext: {
+        feature: "title",
+      },
+      telemetry: {
+        functionId: "generate-conversation-title",
+        includeRuntimeContext: {
+          feature: true,
+        },
+      },
     });
 
     const title = text

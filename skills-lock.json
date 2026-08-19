@@ -6,6 +6,12 @@
       "sourceType": "github",
       "skillPath": "skills/use-ai-sdk/SKILL.md",
       "computedHash": "0883204d11b055e968dee697c5858e68064c27dfd4deb6310212895daa65c5ad"
+    },
+    "langfuse": {
+      "source": "langfuse/skills",
+      "sourceType": "github",
+      "skillPath": "skills/langfuse/SKILL.md",
+      "computedHash": "99657f5601d36243a6bf0f9d22c485f38f6b71309356641c7d2caa2638d7ead8"
     }
   }
 }

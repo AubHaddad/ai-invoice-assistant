@@ -139,8 +139,8 @@ export async function saveAssistantMessage({
 }) {
   const values = {
     content: toMessageContent(message),
-    tokensIn,
-    tokensOut,
+    ...(tokensIn != null ? { tokensIn } : {}),
+    ...(tokensOut != null ? { tokensOut } : {}),
   };
 
   if (isContinuation) {
@@ -154,7 +154,10 @@ export async function saveAssistantMessage({
         role: "assistant",
         ...values,
       })
-      .onConflictDoNothing({ target: messages.id });
+      .onConflictDoUpdate({
+        target: messages.id,
+        set: values,
+      });
   }
 
   await touchConversation(conversationId);

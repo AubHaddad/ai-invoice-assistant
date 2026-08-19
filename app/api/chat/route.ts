@@ -3,9 +3,12 @@ import {
   createUIMessageStreamResponse,
   streamText,
   toUIMessageStream,
+  type LanguageModelUsage,
   type UIMessage,
 } from "ai";
-import { anthropic } from "@ai-sdk/anthropic";
+import { propagateAttributes } from "@langfuse/tracing";
+import { after } from "next/server";
+import { getModel } from "@/lib/ai/models";
 import { getCurrentUserId } from "@/lib/auth/session";
 import {
   ensureConversation,
@@ -16,8 +19,22 @@ import {
 import { SYSTEM_PROMPT } from "@/lib/chat/system-prompt";
 import { truncateMessages } from "@/lib/chat/truncate";
 import { getMessageText } from "@/lib/chat/ui-message";
+import { langfuseSpanProcessor } from "@/lib/observability/langfuse";
 
-const CHAT_MODEL = anthropic("claude-haiku-4-5");
+function toTokenCount(value: number | undefined) {
+  if (typeof value !== "number" || !Number.isFinite(value) || value < 0) {
+    return undefined;
+  }
+
+  return Math.trunc(value);
+}
+
+function tokenCountsFromUsage(usage: LanguageModelUsage | undefined) {
+  return {
+    tokensIn: toTokenCount(usage?.inputTokens),
+    tokensOut: toTokenCount(usage?.outputTokens),
+  };
+}
 
 export async function POST(req: Request) {
   const userId = await getCurrentUserId();
@@ -74,34 +91,69 @@ export async function POST(req: Request) {
     systemPrompt: SYSTEM_PROMPT,
   });
 
-  const result = streamText({
-    model: CHAT_MODEL,
-    instructions: SYSTEM_PROMPT,
-    messages: await convertToModelMessages(truncatedMessages),
-  });
-
-  result.consumeStream();
-
-  return createUIMessageStreamResponse({
-    stream: toUIMessageStream({
-      stream: result.stream,
-      originalMessages: messages,
-      generateMessageId: () => crypto.randomUUID(),
-      onFinish: async ({ responseMessage, isContinuation }) => {
-        try {
-          const usage = await result.usage;
-
-          await saveAssistantMessage({
-            conversationId,
-            message: responseMessage,
-            tokensIn: usage.inputTokens,
-            tokensOut: usage.outputTokens,
-            isContinuation,
-          });
-        } catch (error) {
-          console.error("Failed to persist assistant message", error);
-        }
+  return propagateAttributes(
+    {
+      traceName: "generate-chat-response",
+      userId,
+      sessionId: conversationId,
+      tags: ["chat"],
+      metadata: {
+        conversationId,
       },
-    }),
-  });
+    },
+    async () => {
+      let usage: LanguageModelUsage | undefined;
+
+      const result = streamText({
+        model: getModel("fast"),
+        maxRetries: 0,
+        instructions: SYSTEM_PROMPT,
+        messages: await convertToModelMessages(truncatedMessages),
+        runtimeContext: {
+          userId,
+          conversationId,
+        },
+        telemetry: {
+          functionId: "generate-chat-response",
+          includeRuntimeContext: {
+            userId: true,
+            conversationId: true,
+          },
+        },
+        onEnd: (event) => {
+          usage = event.usage;
+        },
+      });
+
+      result.consumeStream();
+
+      after(async () => {
+        await langfuseSpanProcessor.forceFlush();
+      });
+
+      return createUIMessageStreamResponse({
+        stream: toUIMessageStream({
+          stream: result.stream,
+          originalMessages: messages,
+          generateMessageId: () => crypto.randomUUID(),
+          onFinish: async ({ responseMessage, isContinuation }) => {
+            try {
+              const resolvedUsage =
+                usage ??
+                (await Promise.resolve(result.usage).catch(() => undefined));
+
+              await saveAssistantMessage({
+                conversationId,
+                message: responseMessage,
+                ...tokenCountsFromUsage(resolvedUsage),
+                isContinuation,
+              });
+            } catch (error) {
+              console.error("Failed to persist assistant message", error);
+            }
+          },
+        }),
+      });
+    },
+  );
 }
