@@ -4,9 +4,11 @@ import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
 import {
   ArrowUpIcon,
+  FileTextIcon,
   Loader2Icon,
   PaperclipIcon,
   SquareIcon,
+  XIcon,
 } from "lucide-react";
 import {
   useEffect,
@@ -20,11 +22,15 @@ import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { ComposerUploads } from "@/components/chat/composer-uploads";
 import { useComposerUploads } from "@/components/chat/use-composer-uploads";
-import { InvoiceExtractionCard } from "@/components/chat/invoice-extraction-card";
+import { InvoiceCard } from "@/components/chat/invoice-card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import type { InvoiceAssistantUIMessage } from "@/lib/chat/types";
 import { getMessageText } from "@/lib/chat/message-text";
+import {
+  invoiceSavedSystemText,
+  type SavedInvoice,
+} from "@/lib/invoices/types";
 import { cn } from "@/lib/utils";
 
 function AssistantMarkdown({ text }: { text: string }) {
@@ -71,13 +77,39 @@ function createUuid() {
   return crypto.randomUUID();
 }
 
+type ExtractInvoiceToolPart = Extract<
+  InvoiceAssistantUIMessage["parts"][number],
+  { type: "tool-extractInvoice" }
+>;
+
+function latestSuccessfulExtract(messages: InvoiceAssistantUIMessage[]) {
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const message = messages[index];
+
+    for (let partIndex = message.parts.length - 1; partIndex >= 0; partIndex -= 1) {
+      const part = message.parts[partIndex];
+
+      if (
+        part.type === "tool-extractInvoice" &&
+        part.state === "output-available" &&
+        part.output.ok
+      ) {
+        return part;
+      }
+    }
+  }
+
+  return null;
+}
+
 function ExtractInvoicePart({
   part,
+  isReviewing,
+  onReview,
 }: {
-  part: Extract<
-    InvoiceAssistantUIMessage["parts"][number],
-    { type: "tool-extractInvoice" }
-  >;
+  part: ExtractInvoiceToolPart;
+  isReviewing: boolean;
+  onReview: () => void;
 }) {
   switch (part.state) {
     case "input-streaming":
@@ -89,7 +121,28 @@ function ExtractInvoicePart({
         </div>
       );
     case "output-available":
-      return <InvoiceExtractionCard result={part.output} />;
+      if (!part.output.ok) {
+        return (
+          <p className="text-sm text-destructive">{part.output.error}</p>
+        );
+      }
+
+      return (
+        <div className="inline-flex max-w-full items-center gap-3 rounded-3xl border bg-background px-3 py-2 text-sm">
+          <FileTextIcon className="size-4 shrink-0 text-muted-foreground" />
+          <span className="min-w-0 truncate">
+            Extracted {part.output.fileName}
+          </span>
+          <Button
+            type="button"
+            size="xs"
+            variant={isReviewing ? "secondary" : "ghost"}
+            onClick={onReview}
+          >
+            {isReviewing ? "Reviewing" : "Review"}
+          </Button>
+        </div>
+      );
     case "output-error":
       return (
         <p className="text-sm text-destructive">
@@ -128,7 +181,7 @@ export function ChatPanel({
         }),
       }),
   );
-  const { messages, sendMessage, status, stop, error } =
+  const { messages, sendMessage, status, stop, error, clearError } =
     useChat<InvoiceAssistantUIMessage>({
       id: conversationId,
       messages: initialMessages,
@@ -138,6 +191,29 @@ export function ChatPanel({
         onConversationUpdated?.();
       },
     });
+
+  const [reviewOpen, setReviewOpen] = useState(false);
+  const [reviewPart, setReviewPart] = useState<ExtractInvoiceToolPart | null>(
+    null,
+  );
+  const autoOpenedToolCallIdRef = useRef<string | null>(null);
+
+  function openReview(part: ExtractInvoiceToolPart) {
+    setReviewPart(part);
+    setReviewOpen(true);
+  }
+
+  function closeReview() {
+    setReviewOpen(false);
+  }
+
+  function onInvoiceSaved(saved: SavedInvoice) {
+    clearError();
+    void sendMessage({
+      role: "system",
+      parts: [{ type: "text", text: invoiceSavedSystemText(saved) }],
+    });
+  }
 
   const listRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -167,6 +243,17 @@ export function ChatPanel({
 
     list.scrollTop = list.scrollHeight;
   }, [messages, status]);
+
+  useEffect(() => {
+    const latest = latestSuccessfulExtract(messages);
+
+    if (!latest || latest.toolCallId === autoOpenedToolCallIdRef.current) {
+      return;
+    }
+
+    autoOpenedToolCallIdRef.current = latest.toolCallId;
+    openReview(latest);
+  }, [messages]);
 
   function submit() {
     const text =
@@ -222,7 +309,13 @@ export function ChatPanel({
   }
 
   return (
-    <div className="mx-auto flex min-h-0 w-full max-w-3xl flex-1 flex-col">
+    <div className="flex min-h-0 min-w-0 flex-1">
+      <div
+        className={cn(
+          "mx-auto min-h-0 w-full max-w-3xl flex-1 flex-col",
+          reviewOpen ? "hidden md:flex" : "flex",
+        )}
+      >
       <div
         ref={listRef}
         className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-4 py-6"
@@ -238,6 +331,10 @@ export function ChatPanel({
           </div>
         ) : (
           messages.map((message) => {
+            if (message.role === "system") {
+              return null;
+            }
+
             const isUser = message.role === "user";
 
             if (isUser) {
@@ -277,8 +374,14 @@ export function ChatPanel({
 
                   if (part.type === "tool-extractInvoice") {
                     return (
-                      <div key={part.toolCallId} className="w-full max-w-xl">
-                        <ExtractInvoicePart part={part} />
+                      <div key={part.toolCallId}>
+                        <ExtractInvoicePart
+                          part={part}
+                          isReviewing={
+                            reviewOpen && reviewPart?.toolCallId === part.toolCallId
+                          }
+                          onReview={() => openReview(part)}
+                        />
                       </div>
                     );
                   }
@@ -297,7 +400,7 @@ export function ChatPanel({
         )}
 
         {status === "submitted" &&
-        messages[messages.length - 1]?.role === "user" ? (
+        messages[messages.length - 1]?.role !== "assistant" ? (
           <div className="flex justify-start">
             <div className="inline-flex items-center gap-2 rounded-3xl bg-muted px-4 py-2.5 text-sm text-muted-foreground">
               <Loader2Icon className="size-4 animate-spin" />
@@ -388,6 +491,33 @@ export function ChatPanel({
           Enter to send · Shift+Enter for a new line · PDF or image
         </p>
       </form>
+      </div>
+
+      {reviewOpen && reviewPart?.state === "output-available" ? (
+        <aside className="flex min-h-0 w-full shrink-0 flex-col border-l bg-background md:w-md">
+          <div className="flex items-center justify-between gap-3 border-b px-4 py-3">
+            <p className="font-heading text-sm font-medium">Invoice review</p>
+            <Button
+              type="button"
+              size="icon-sm"
+              variant="ghost"
+              aria-label="Close invoice review"
+              onClick={closeReview}
+            >
+              <XIcon />
+            </Button>
+          </div>
+          <div className="min-h-0 flex-1 overflow-y-auto p-4">
+            <InvoiceCard
+              key={reviewPart.toolCallId}
+              result={reviewPart.output}
+              conversationId={conversationId}
+              onSaved={onInvoiceSaved}
+              onDiscard={closeReview}
+            />
+          </div>
+        </aside>
+      ) : null}
     </div>
   );
 }

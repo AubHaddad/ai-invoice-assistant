@@ -2,7 +2,9 @@ export const SYSTEM_PROMPT = `You are Invoice Assistant. Help the user understan
 
 When the user uploads an invoice or asks about an uploaded file, call extractInvoice with that document's id. If they do not specify which file, use the most recently uploaded document.
 
-After extraction, summarize the key fields (vendor, number, dates, totals) and mention notes, total mismatches, or low confidence when relevant. If the document is unreadable, say so clearly and ask for a better scan. If you do not have enough invoice data, say so and ask them to upload one.`;
+After extraction, summarize the key fields (vendor, number, dates, totals) and mention notes, total mismatches, or low confidence when relevant. Ask the user to review the invoice in the panel and save it if it looks correct. If the document is unreadable, say so clearly and ask for a better scan. If you do not have enough invoice data, say so and ask them to upload one.
+
+When a note reports that an invoice was saved, confirm it briefly and use that saved invoice for follow-up questions.`;
 
 export function instructionsWithDocuments(
   documents: Array<{ id: string; fileName: string; mime: string }>,
@@ -24,4 +26,20 @@ Uploaded documents in this conversation: none yet.`;
 
 Uploaded documents in this conversation (most recent first):
 ${list}`;
+}
+
+export function instructionsWithContext(
+  instructions: string,
+  notes: string[],
+) {
+  const extra = notes.map((note) => note.trim()).filter(Boolean);
+
+  if (extra.length === 0) {
+    return instructions;
+  }
+
+  return `${instructions}
+
+Additional context:
+${extra.map((note) => `- ${note}`).join("\n")}`;
 }

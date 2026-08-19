@@ -1,6 +1,6 @@
 "use client";
 
-import { Loader2Icon } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { UserMenu } from "@/components/auth/user-menu";
 import { ChatPanel } from "@/components/chat/chat-panel";
@@ -14,21 +14,20 @@ type ChatAppProps = {
     email?: string | null;
     image?: string | null;
   };
+  conversationId: string;
   initialConversations: ConversationSummary[];
+  initialMessages: InvoiceAssistantUIMessage[];
 };
 
-function createChatId() {
-  return crypto.randomUUID();
-}
-
-export function ChatApp({ user, initialConversations }: ChatAppProps) {
+export function ChatApp({
+  user,
+  conversationId,
+  initialConversations,
+  initialMessages,
+}: ChatAppProps) {
+  const router = useRouter();
   const [conversations, setConversations] =
     useState<ConversationSummary[]>(initialConversations);
-  const [activeId, setActiveId] = useState(createChatId);
-  const [initialMessages, setInitialMessages] = useState<
-    InvoiceAssistantUIMessage[]
-  >([]);
-  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
 
   const persistedIds = useMemo(
     () => new Set(conversations.map((conversation) => conversation.id)),
@@ -49,34 +48,7 @@ export function ChatApp({ user, initialConversations }: ChatAppProps) {
   }
 
   function startNewChat() {
-    setActiveId(createChatId());
-    setInitialMessages([]);
-  }
-
-  async function selectConversation(id: string) {
-    if (id === activeId) {
-      return;
-    }
-
-    setIsLoadingHistory(true);
-
-    try {
-      const response = await fetch(`/api/conversations/${id}`);
-
-      if (!response.ok) {
-        throw new Error("Failed to load conversation");
-      }
-
-      const data = (await response.json()) as {
-        messages: InvoiceAssistantUIMessage[];
-      };
-      setActiveId(id);
-      setInitialMessages(data.messages);
-    } catch (error) {
-      console.error(error);
-    } finally {
-      setIsLoadingHistory(false);
-    }
+    router.push(`/${crypto.randomUUID()}`);
   }
 
   return (
@@ -84,11 +56,8 @@ export function ChatApp({ user, initialConversations }: ChatAppProps) {
       <aside className="flex w-56 shrink-0 flex-col border-r bg-sidebar text-sidebar-foreground sm:w-64">
         <ChatSidebar
           conversations={conversations}
-          activeId={activeId}
+          activeId={conversationId}
           persistedIds={persistedIds}
-          onSelect={(id) => {
-            void selectConversation(id);
-          }}
           onNewChat={startNewChat}
         />
       </aside>
@@ -101,21 +70,13 @@ export function ChatApp({ user, initialConversations }: ChatAppProps) {
           <UserMenu user={user} />
         </header>
 
-        {isLoadingHistory ? (
-          <div className="flex flex-1 items-center justify-center text-muted-foreground">
-            <Loader2Icon className="size-5 animate-spin" />
-            <span className="sr-only">Loading conversation</span>
-          </div>
-        ) : (
-          <ChatPanel
-            key={activeId}
-            conversationId={activeId}
-            initialMessages={initialMessages}
-            onConversationUpdated={() => {
-              void refreshConversations();
-            }}
-          />
-        )}
+        <ChatPanel
+          conversationId={conversationId}
+          initialMessages={initialMessages}
+          onConversationUpdated={() => {
+            void refreshConversations();
+          }}
+        />
       </div>
     </div>
   );

@@ -15,9 +15,10 @@ import {
   ensureConversation,
   isUuid,
   saveAssistantMessage,
+  saveSystemMessage,
   saveUserMessage,
 } from "@/lib/chat/store";
-import { instructionsWithDocuments } from "@/lib/chat/system-prompt";
+import { instructionsWithContext, instructionsWithDocuments } from "@/lib/chat/system-prompt";
 import { invoiceAssistantTools } from "@/lib/chat/tools";
 import { truncateMessages } from "@/lib/chat/truncate";
 import { getMessageText } from "@/lib/chat/ui-message";
@@ -115,17 +116,47 @@ export async function POST(req: Request) {
     conversationId,
     userId,
   );
-  const instructions = instructionsWithDocuments(uploadedDocuments);
+  const systemNotes = messages
+    .filter((message) => message.role === "system")
+    .map((message) => getMessageText(message))
+    .filter(Boolean);
+  const conversationMessages = messages.filter(
+    (message) => message.role !== "system",
+  );
+  const instructions = instructionsWithContext(
+    instructionsWithDocuments(uploadedDocuments),
+    systemNotes,
+  );
 
   await saveUserMessage({
     conversationId,
     message: lastUserMessage,
   });
 
+  const lastMessage = messages[messages.length - 1];
+
+  if (lastMessage?.role === "system" && isUuid(lastMessage.id)) {
+    await saveSystemMessage({
+      conversationId,
+      message: lastMessage,
+    });
+  }
+
   const truncatedMessages = truncateMessages({
-    messages,
+    messages: conversationMessages,
     systemPrompt: instructions,
   });
+  const modelMessages = [
+    ...(await convertToModelMessages(truncatedMessages)),
+    ...(lastMessage?.role === "system"
+      ? [
+          {
+            role: "user" as const,
+            content: "Please confirm the invoice was saved.",
+          },
+        ]
+      : []),
+  ];
 
   return propagateAttributes(
     {
@@ -144,7 +175,7 @@ export async function POST(req: Request) {
         model: getModel("fast"),
         maxRetries: 0,
         instructions,
-        messages: await convertToModelMessages(truncatedMessages),
+        messages: modelMessages,
         tools: invoiceAssistantTools,
         toolsContext: {
           extractInvoice: { userId },

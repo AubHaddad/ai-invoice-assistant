@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { PlusIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -9,7 +10,6 @@ type ChatSidebarProps = {
   conversations: ConversationSummary[];
   activeId: string;
   persistedIds: Set<string>;
-  onSelect: (id: string) => void;
   onNewChat: () => void;
 };
 
@@ -21,7 +21,6 @@ export function ChatSidebar({
   conversations,
   activeId,
   persistedIds,
-  onSelect,
   onNewChat,
 }: ChatSidebarProps) {
   const isExistingChat = persistedIds.has(activeId);
@@ -53,19 +52,18 @@ export function ChatSidebar({
 
               return (
                 <li key={conversation.id}>
-                  <button
-                    type="button"
+                  <Link
+                    href={`/${conversation.id}`}
                     aria-current={isActive ? "page" : undefined}
-                    onClick={() => onSelect(conversation.id)}
                     className={cn(
-                      "w-full truncate rounded-xl px-3 py-2 text-left text-sm transition-colors",
+                      "block w-full truncate rounded-xl px-3 py-2 text-left text-sm transition-colors",
                       isActive
                         ? "bg-sidebar-accent text-sidebar-accent-foreground"
                         : "text-sidebar-foreground hover:bg-sidebar-accent/70",
                     )}
                   >
                     {conversationLabel(conversation)}
-                  </button>
+                  </Link>
                 </li>
               );
             })}

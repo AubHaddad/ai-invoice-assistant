@@ -111,6 +111,30 @@ export async function saveUserMessage({
   conversationId: string;
   message: UIMessage;
 }) {
+  await saveIncomingMessage({ conversationId, message });
+}
+
+export async function saveSystemMessage({
+  conversationId,
+  message,
+}: {
+  conversationId: string;
+  message: UIMessage;
+}) {
+  await saveIncomingMessage({ conversationId, message });
+}
+
+async function saveIncomingMessage({
+  conversationId,
+  message,
+}: {
+  conversationId: string;
+  message: UIMessage;
+}) {
+  if (message.role !== "user" && message.role !== "system") {
+    return;
+  }
+
   await db
     .insert(messages)
     .values({
