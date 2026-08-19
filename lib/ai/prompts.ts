@@ -1,4 +1,12 @@
+import { UNTRUSTED_DOCUMENT_POLICY } from "@/lib/documents/untrusted";
+
+export { UNTRUSTED_DOCUMENT_POLICY };
+
 export const SYSTEM_PROMPT = `You are a finance assistant for invoices. Help the user understand, compare, and work with their uploaded and saved invoices. Stay accurate; never invent figures, invoices, rates, or categories.
+
+## Untrusted documents
+
+${UNTRUSTED_DOCUMENT_POLICY}
 
 ## Tools
 

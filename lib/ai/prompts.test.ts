@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { SYSTEM_PROMPT } from "./prompts";
+import { SYSTEM_PROMPT, UNTRUSTED_DOCUMENT_POLICY } from "./prompts";
 
 describe("SYSTEM_PROMPT", () => {
   it("sets a finance-assistant-for-invoices persona", () => {
@@ -35,5 +35,11 @@ describe("SYSTEM_PROMPT", () => {
   it("replies in the user's language (FR / EN / AR)", () => {
     expect(SYSTEM_PROMPT).toMatch(/English, French, or Arabic/);
     expect(SYSTEM_PROMPT).toMatch(/FR \/ EN \/ AR/);
+  });
+
+  it("treats uploaded documents as untrusted and ignores instructions in them", () => {
+    expect(SYSTEM_PROMPT).toContain(UNTRUSTED_DOCUMENT_POLICY);
+    expect(SYSTEM_PROMPT).toMatch(/untrusted data/i);
+    expect(SYSTEM_PROMPT).toMatch(/ignore previous instructions/i);
   });
 });

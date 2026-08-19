@@ -1,5 +1,10 @@
 export const MAX_DOCUMENT_BYTES = 20 * 1024 * 1024;
 
+/** Invoices rarely need more pages; higher counts are a common PDF-bomb signal. */
+export const MAX_DOCUMENT_PAGES = 20;
+
+export const PDF_MIME = "application/pdf";
+
 export const ALLOWED_DOCUMENT_MIME_TYPES = [
   "application/pdf",
   "image/jpeg",

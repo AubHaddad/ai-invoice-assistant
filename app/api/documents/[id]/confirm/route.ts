@@ -4,9 +4,19 @@ import {
   getDocumentForUser,
   markDocumentFailed,
   markDocumentUploaded,
+  setDocumentPages,
   toDocumentSummary,
 } from "@/lib/documents/store";
-import { objectExists } from "@/lib/storage/gcs";
+import {
+  rejectedDocumentSize,
+  validateUploadedBytes,
+} from "@/lib/documents/validate";
+import {
+  deleteObject,
+  downloadObject,
+  getObjectSize,
+  objectExists,
+} from "@/lib/storage/gcs";
 
 export async function POST(
   _req: Request,
@@ -41,6 +51,18 @@ export async function POST(
     );
   }
 
+  const rejectUpload = async (error: string) => {
+    try {
+      await deleteObject(document.gcsPath);
+    } catch {
+      // Keep the document failed even if storage cleanup does not succeed.
+    }
+
+    await markDocumentFailed(id, userId);
+
+    return Response.json({ error }, { status: 400 });
+  };
+
   const exists = await objectExists(document.gcsPath);
 
   if (!exists) {
@@ -49,6 +71,27 @@ export async function POST(
       { error: "File was not found in storage" },
       { status: 409 },
     );
+  }
+
+  const storedSize = await getObjectSize(document.gcsPath);
+
+  if (storedSize !== null) {
+    const sizeError = rejectedDocumentSize(storedSize);
+
+    if (sizeError) {
+      return rejectUpload(sizeError);
+    }
+  }
+
+  const bytes = await downloadObject(document.gcsPath);
+  const validation = await validateUploadedBytes({
+    bytes,
+    declaredMime: document.mime,
+    sizeBytes: storedSize ?? bytes.length,
+  });
+
+  if (!validation.ok) {
+    return rejectUpload(validation.error);
   }
 
   const uploaded = await markDocumentUploaded(id, userId);
@@ -60,5 +103,14 @@ export async function POST(
     );
   }
 
-  return Response.json({ document: toDocumentSummary(uploaded) });
+  if (validation.pageCount) {
+    await setDocumentPages(id, userId, validation.pageCount);
+  }
+
+  return Response.json({
+    document: toDocumentSummary({
+      ...uploaded,
+      pages: validation.pageCount ?? uploaded.pages,
+    }),
+  });
 }

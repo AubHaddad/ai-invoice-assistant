@@ -70,6 +70,25 @@ export async function objectExists(storageKey: string) {
   return exists;
 }
 
+export async function getObjectSize(storageKey: string) {
+  const [metadata] = await withTimeout(
+    getFile(storageKey).getMetadata(),
+    EXTERNAL_TIMEOUT.gcsMs,
+    "Invoice file metadata timed out.",
+  );
+  const size = Number(metadata.size);
+
+  return Number.isFinite(size) ? size : null;
+}
+
+export async function deleteObject(storageKey: string) {
+  await withTimeout(
+    getFile(storageKey).delete({ ignoreNotFound: true }),
+    EXTERNAL_TIMEOUT.gcsMs,
+    "Invoice file delete timed out.",
+  );
+}
+
 export async function downloadObject(storageKey: string) {
   const [contents] = await withTimeout(
     getFile(storageKey).download(),

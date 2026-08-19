@@ -3,10 +3,18 @@ import "server-only";
 import { getModel } from "@/lib/ai/models";
 import { toPublicErrorMessage } from "@/lib/chat/error-message";
 import { AGENT_TIMEOUT } from "@/lib/chat/loop";
+import { PDF_MIME } from "@/lib/documents/constants";
 import {
   getDocumentForUser,
   setDocumentPages,
 } from "@/lib/documents/store";
+import {
+  UNTRUSTED_DOCUMENT_POLICY,
+  buildExtractionTextPrompt,
+  untrustedImageExtractionPrompt,
+  wrapUntrustedDocumentText,
+} from "@/lib/documents/untrusted";
+import { validateUploadedBytes } from "@/lib/documents/validate";
 import { logFailureToLangfuse } from "@/lib/observability/log-failure";
 import { abortAfter } from "@/lib/timeout";
 import {
@@ -33,6 +41,7 @@ import {
   reconcileTotals,
 } from "./postprocess";
 import type {
+  ExtractInvoiceRejected,
   ExtractInvoiceResult,
   ExtractInvoiceUnreadable,
   InvoiceExtractionPath,
@@ -40,15 +49,15 @@ import type {
 
 export type {
   ExtractInvoiceFailure,
+  ExtractInvoiceRejected,
   ExtractInvoiceResult,
   ExtractInvoiceSuccess,
   ExtractInvoiceUnreadable,
   InvoiceExtractionPath,
 } from "./types";
 
-const PDF_MIME = "application/pdf";
-
 const EXTRACTION_INSTRUCTIONS = `Extract invoice fields from the provided document.
+${UNTRUSTED_DOCUMENT_POLICY}
 Pages are labeled with markers like "--- Page 1 ---". Combine line items from every page into one list. Do not duplicate the same line item.
 Use ISO dates (YYYY-MM-DD).
 Amounts are numbers in the invoice currency, not cents.
@@ -67,6 +76,19 @@ function unreadableResult(
   return {
     ok: false,
     code: "unreadable",
+    error,
+    documentId: document.id,
+    fileName: document.fileName,
+  };
+}
+
+function rejectedResult(
+  document: { id: string; fileName: string },
+  error: string,
+): ExtractInvoiceRejected {
+  return {
+    ok: false,
+    code: "rejected",
     error,
     documentId: document.id,
     fileName: document.fileName,
@@ -162,7 +184,7 @@ async function extractFromText({
     messages: [
       {
         role: "user",
-        content: `Extract the invoice from this text.\n\nFile: ${fileName}\n\n${text}`,
+        content: buildExtractionTextPrompt(fileName, text),
       },
     ],
   });
@@ -188,7 +210,7 @@ async function extractFromImages({
         content: [
           {
             type: "text",
-            text: `${prompt}\n\nFile: ${fileName}`,
+            text: untrustedImageExtractionPrompt(fileName, prompt),
           },
           ...images.map((image) => ({
             type: "file" as const,
@@ -345,7 +367,7 @@ async function extractPdfInvoice({
   const extraction = await extractFromImages({
     fileName,
     prompt: textIsUsable
-      ? `Extract the invoice. Selectable text is below; attached images are pages without a usable text layer.\n\n${concatenated}`
+      ? `Selectable text is below; attached images are pages without a usable text layer.\n\n${wrapUntrustedDocumentText({ fileName, text: concatenated })}`
       : "Extract the invoice from these page images, in order.",
     images: visionPages.length > 0 ? visionPages : images,
     abortSignal,
@@ -378,7 +400,16 @@ export async function extractInvoiceFromDocument({
   }
 
   const bytes = await downloadObject(document.gcsPath);
-  const isPdf = document.mime === PDF_MIME;
+  const validation = await validateUploadedBytes({
+    bytes,
+    declaredMime: document.mime,
+  });
+
+  if (!validation.ok) {
+    return rejectedResult(document, validation.error);
+  }
+
+  const isPdf = validation.mime === PDF_MIME;
 
   try {
     if (isPdf) {
@@ -417,7 +448,7 @@ export async function extractInvoiceFromDocument({
           content: [
             {
               type: "text",
-              text: `Extract the invoice from this image (${document.fileName}).`,
+              text: untrustedImageExtractionPrompt(document.fileName),
             },
             {
               type: "file",

@@ -32,6 +32,17 @@ export function concatenatePdfPages(pages: PdfPageText[]) {
     .join("\n\n");
 }
 
+export async function countPdfPages(bytes: Buffer) {
+  const parser = new PDFParse({ data: Uint8Array.from(bytes) });
+
+  try {
+    const info = await parser.getInfo();
+    return info.total;
+  } finally {
+    await parser.destroy();
+  }
+}
+
 export async function extractPdfPages(bytes: Buffer) {
   const parser = new PDFParse({ data: Uint8Array.from(bytes) });
 

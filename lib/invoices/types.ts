@@ -23,6 +23,14 @@ export const ExtractInvoiceUnreadableSchema = z.object({
   fileName: z.string(),
 });
 
+export const ExtractInvoiceRejectedSchema = z.object({
+  ok: z.literal(false),
+  code: z.literal("rejected"),
+  error: z.string(),
+  documentId: z.string(),
+  fileName: z.string(),
+});
+
 export const ExtractInvoiceFailureSchema = z.object({
   ok: z.literal(false),
   code: z.literal("error").optional(),
@@ -32,6 +40,7 @@ export const ExtractInvoiceFailureSchema = z.object({
 export const ExtractInvoiceResultSchema = z.union([
   ExtractInvoiceSuccessSchema,
   ExtractInvoiceUnreadableSchema,
+  ExtractInvoiceRejectedSchema,
   ExtractInvoiceFailureSchema,
 ]);
 
@@ -39,6 +48,7 @@ export type ExtractInvoiceSuccess = z.infer<typeof ExtractInvoiceSuccessSchema>;
 export type ExtractInvoiceUnreadable = z.infer<
   typeof ExtractInvoiceUnreadableSchema
 >;
+export type ExtractInvoiceRejected = z.infer<typeof ExtractInvoiceRejectedSchema>;
 export type ExtractInvoiceFailure = z.infer<typeof ExtractInvoiceFailureSchema>;
 export type ExtractInvoiceResult = z.infer<typeof ExtractInvoiceResultSchema>;
 
