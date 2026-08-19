@@ -87,6 +87,14 @@ export function useComposerUploads(conversationId: string) {
     setItems((current) => current.filter((item) => item.id !== id));
   }, []);
 
+  const clearUploaded = useCallback(() => {
+    setItems((current) => current.filter((item) => item.status === "error"));
+  }, []);
+
+  const uploadedDocumentIds = items.flatMap((item) =>
+    item.status === "uploaded" && item.documentId ? [item.documentId] : [],
+  );
+
   const isUploading = items.some(
     (item) =>
       item.status === "signing" ||
@@ -97,8 +105,10 @@ export function useComposerUploads(conversationId: string) {
   return {
     items,
     isUploading,
+    uploadedDocumentIds,
     uploadFiles,
     removeItem,
+    clearUploaded,
     accept: DOCUMENT_FILE_ACCEPT,
   };
 }

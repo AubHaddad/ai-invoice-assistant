@@ -68,3 +68,8 @@ export async function objectExists(storageKey: string) {
   const [exists] = await getFile(storageKey).exists();
   return exists;
 }
+
+export async function downloadObject(storageKey: string) {
+  const [contents] = await getFile(storageKey).download();
+  return contents;
+}

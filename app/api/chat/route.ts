@@ -1,6 +1,7 @@
 import {
   convertToModelMessages,
   createUIMessageStreamResponse,
+  isStepCount,
   streamText,
   toUIMessageStream,
   type LanguageModelUsage,
@@ -16,10 +17,17 @@ import {
   saveAssistantMessage,
   saveUserMessage,
 } from "@/lib/chat/store";
-import { SYSTEM_PROMPT } from "@/lib/chat/system-prompt";
+import { instructionsWithDocuments } from "@/lib/chat/system-prompt";
+import { invoiceAssistantTools } from "@/lib/chat/tools";
 import { truncateMessages } from "@/lib/chat/truncate";
 import { getMessageText } from "@/lib/chat/ui-message";
+import {
+  attachDocumentsToConversation,
+  listUploadedDocumentsForConversation,
+} from "@/lib/documents/store";
 import { langfuseSpanProcessor } from "@/lib/observability/langfuse";
+
+export const maxDuration = 60;
 
 function toTokenCount(value: number | undefined) {
   if (typeof value !== "number" || !Number.isFinite(value) || value < 0) {
@@ -36,6 +44,20 @@ function tokenCountsFromUsage(usage: LanguageModelUsage | undefined) {
   };
 }
 
+function readDocumentIds(value: unknown) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return [
+    ...new Set(
+      value.filter(
+        (id): id is string => typeof id === "string" && isUuid(id),
+      ),
+    ),
+  ];
+}
+
 export async function POST(req: Request) {
   const userId = await getCurrentUserId();
 
@@ -46,10 +68,12 @@ export async function POST(req: Request) {
   const body = (await req.json()) as {
     id?: string;
     messages?: UIMessage[];
+    documentIds?: unknown;
   };
 
   const conversationId = body.id;
   const messages = body.messages;
+  const documentIds = readDocumentIds(body.documentIds);
 
   if (!conversationId || !isUuid(conversationId)) {
     return Response.json({ error: "Invalid conversation id" }, { status: 400 });
@@ -81,6 +105,18 @@ export async function POST(req: Request) {
     throw error;
   }
 
+  await attachDocumentsToConversation({
+    documentIds,
+    conversationId,
+    userId,
+  });
+
+  const uploadedDocuments = await listUploadedDocumentsForConversation(
+    conversationId,
+    userId,
+  );
+  const instructions = instructionsWithDocuments(uploadedDocuments);
+
   await saveUserMessage({
     conversationId,
     message: lastUserMessage,
@@ -88,7 +124,7 @@ export async function POST(req: Request) {
 
   const truncatedMessages = truncateMessages({
     messages,
-    systemPrompt: SYSTEM_PROMPT,
+    systemPrompt: instructions,
   });
 
   return propagateAttributes(
@@ -107,8 +143,13 @@ export async function POST(req: Request) {
       const result = streamText({
         model: getModel("fast"),
         maxRetries: 0,
-        instructions: SYSTEM_PROMPT,
+        instructions,
         messages: await convertToModelMessages(truncatedMessages),
+        tools: invoiceAssistantTools,
+        toolsContext: {
+          extractInvoice: { userId },
+        },
+        stopWhen: isStepCount(5),
         runtimeContext: {
           userId,
           conversationId,

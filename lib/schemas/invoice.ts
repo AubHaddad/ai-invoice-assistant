@@ -41,8 +41,14 @@ export const InvoiceSchema = z.object({
   lineItems: z.array(LineItemSchema).describe("Invoice line items"),
 });
 
-/** Extraction-only shape (no `raw` blob). */
-export const InvoiceExtractionSchema = InvoiceSchema.omit({ raw: true });
+/** Extraction-only shape: InvoiceSchema without `raw`, plus model notes. */
+export const InvoiceExtractionSchema = InvoiceSchema.omit({ raw: true }).extend({
+  notes: z
+    .string()
+    .describe(
+      "Anything ambiguous, missing, unreadable, or inferred. Empty string if the invoice is clear.",
+    ),
+});
 
 export type LineItem = z.infer<typeof LineItemSchema>;
 export type Invoice = z.infer<typeof InvoiceSchema>;

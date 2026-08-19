@@ -1,11 +1,11 @@
 "use client";
 
-import type { UIMessage } from "ai";
 import { Loader2Icon } from "lucide-react";
 import { useMemo, useState } from "react";
 import { UserMenu } from "@/components/auth/user-menu";
 import { ChatPanel } from "@/components/chat/chat-panel";
 import { ChatSidebar } from "@/components/chat/chat-sidebar";
+import type { InvoiceAssistantUIMessage } from "@/lib/chat/types";
 import type { ConversationSummary } from "@/lib/chat/types";
 
 type ChatAppProps = {
@@ -25,7 +25,9 @@ export function ChatApp({ user, initialConversations }: ChatAppProps) {
   const [conversations, setConversations] =
     useState<ConversationSummary[]>(initialConversations);
   const [activeId, setActiveId] = useState(createChatId);
-  const [initialMessages, setInitialMessages] = useState<UIMessage[]>([]);
+  const [initialMessages, setInitialMessages] = useState<
+    InvoiceAssistantUIMessage[]
+  >([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
 
   const persistedIds = useMemo(
@@ -65,7 +67,9 @@ export function ChatApp({ user, initialConversations }: ChatAppProps) {
         throw new Error("Failed to load conversation");
       }
 
-      const data = (await response.json()) as { messages: UIMessage[] };
+      const data = (await response.json()) as {
+        messages: InvoiceAssistantUIMessage[];
+      };
       setActiveId(id);
       setInitialMessages(data.messages);
     } catch (error) {

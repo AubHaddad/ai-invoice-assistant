@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { and, desc, eq, inArray } from "drizzle-orm";
 import "server-only";
 import { getConversationForUser } from "@/lib/chat/store";
 import { db } from "@/lib/db";
@@ -79,6 +79,61 @@ export async function markDocumentUploaded(id: string, userId: string) {
         eq(documents.status, "uploading"),
       ),
     )
+    .returning();
+
+  return document ?? null;
+}
+
+export async function attachDocumentsToConversation({
+  documentIds,
+  conversationId,
+  userId,
+}: {
+  documentIds: string[];
+  conversationId: string;
+  userId: string;
+}) {
+  if (documentIds.length === 0) {
+    return;
+  }
+
+  await db
+    .update(documents)
+    .set({ conversationId })
+    .where(
+      and(
+        eq(documents.userId, userId),
+        inArray(documents.id, documentIds),
+      ),
+    );
+}
+
+export async function listUploadedDocumentsForConversation(
+  conversationId: string,
+  userId: string,
+) {
+  return db
+    .select()
+    .from(documents)
+    .where(
+      and(
+        eq(documents.userId, userId),
+        eq(documents.conversationId, conversationId),
+        eq(documents.status, "uploaded"),
+      ),
+    )
+    .orderBy(desc(documents.createdAt));
+}
+
+export async function setDocumentPages(
+  id: string,
+  userId: string,
+  pages: number,
+) {
+  const [document] = await db
+    .update(documents)
+    .set({ pages })
+    .where(and(eq(documents.id, id), eq(documents.userId, userId)))
     .returning();
 
   return document ?? null;

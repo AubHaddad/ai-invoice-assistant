@@ -1,7 +1,7 @@
 "use client";
 
 import { useChat } from "@ai-sdk/react";
-import { DefaultChatTransport, type UIMessage } from "ai";
+import { DefaultChatTransport } from "ai";
 import {
   ArrowUpIcon,
   Loader2Icon,
@@ -20,8 +20,10 @@ import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { ComposerUploads } from "@/components/chat/composer-uploads";
 import { useComposerUploads } from "@/components/chat/use-composer-uploads";
+import { InvoiceExtractionCard } from "@/components/chat/invoice-extraction-card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import type { InvoiceAssistantUIMessage } from "@/lib/chat/types";
 import { getMessageText } from "@/lib/chat/message-text";
 import { cn } from "@/lib/utils";
 
@@ -69,9 +71,39 @@ function createUuid() {
   return crypto.randomUUID();
 }
 
+function ExtractInvoicePart({
+  part,
+}: {
+  part: Extract<
+    InvoiceAssistantUIMessage["parts"][number],
+    { type: "tool-extractInvoice" }
+  >;
+}) {
+  switch (part.state) {
+    case "input-streaming":
+    case "input-available":
+      return (
+        <div className="inline-flex items-center gap-2 text-sm text-muted-foreground">
+          <Loader2Icon className="size-4 animate-spin" />
+          Extracting invoice…
+        </div>
+      );
+    case "output-available":
+      return <InvoiceExtractionCard result={part.output} />;
+    case "output-error":
+      return (
+        <p className="text-sm text-destructive">
+          {part.errorText || "Extraction failed."}
+        </p>
+      );
+    default:
+      return null;
+  }
+}
+
 type ChatPanelProps = {
   conversationId: string;
-  initialMessages?: UIMessage[];
+  initialMessages?: InvoiceAssistantUIMessage[];
   onConversationUpdated?: () => void;
 };
 
@@ -81,18 +113,31 @@ export function ChatPanel({
   onConversationUpdated,
 }: ChatPanelProps) {
   const [input, setInput] = useState("");
+  const uploadedDocumentIdsRef = useRef<string[]>([]);
   const [transport] = useState(
-    () => new DefaultChatTransport({ api: "/api/chat" }),
+    () =>
+      new DefaultChatTransport({
+        api: "/api/chat",
+        prepareSendMessagesRequest: ({ id, messages, body }) => ({
+          body: {
+            ...body,
+            id,
+            messages,
+            documentIds: uploadedDocumentIdsRef.current,
+          },
+        }),
+      }),
   );
-  const { messages, sendMessage, status, stop, error } = useChat({
-    id: conversationId,
-    messages: initialMessages,
-    generateId: createUuid,
-    transport,
-    onFinish: () => {
-      onConversationUpdated?.();
-    },
-  });
+  const { messages, sendMessage, status, stop, error } =
+    useChat<InvoiceAssistantUIMessage>({
+      id: conversationId,
+      messages: initialMessages,
+      generateId: createUuid,
+      transport,
+      onFinish: () => {
+        onConversationUpdated?.();
+      },
+    });
 
   const listRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -100,12 +145,19 @@ export function ChatPanel({
   const {
     items: uploads,
     isUploading,
+    uploadedDocumentIds,
     uploadFiles,
     removeItem,
+    clearUploaded,
     accept,
   } = useComposerUploads(conversationId);
+  uploadedDocumentIdsRef.current = uploadedDocumentIds;
   const isBusy = status === "submitted" || status === "streaming";
-  const canSend = status === "ready" && input.trim().length > 0 && !isUploading;
+  const hasUploaded = uploadedDocumentIds.length > 0;
+  const canSend =
+    status === "ready" &&
+    !isUploading &&
+    (input.trim().length > 0 || hasUploaded);
 
   useEffect(() => {
     const list = listRef.current;
@@ -117,13 +169,16 @@ export function ChatPanel({
   }, [messages, status]);
 
   function submit() {
-    const text = input.trim();
+    const text =
+      input.trim() ||
+      (hasUploaded ? "Extract the uploaded invoice." : "");
     if (!text || status !== "ready") {
       return;
     }
 
     void sendMessage({ text });
     setInput("");
+    clearUploaded();
   }
 
   function onKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
@@ -183,38 +238,59 @@ export function ChatPanel({
           </div>
         ) : (
           messages.map((message) => {
-            const text = getMessageText(message);
             const isUser = message.role === "user";
+
+            if (isUser) {
+              return (
+                <div key={message.id} className="flex w-full justify-end">
+                  <div className="max-w-[85%] rounded-3xl bg-primary px-4 py-2.5 text-primary-foreground">
+                    <p className="whitespace-pre-wrap text-sm leading-relaxed wrap-break-word">
+                      {getMessageText(message)}
+                    </p>
+                  </div>
+                </div>
+              );
+            }
+
+            const hasContent = message.parts.some(
+              (part) =>
+                (part.type === "text" && part.text) ||
+                part.type === "tool-extractInvoice",
+            );
 
             return (
               <div
                 key={message.id}
-                className={cn(
-                  "flex w-full",
-                  isUser ? "justify-end" : "justify-start",
-                )}
+                className="flex w-full flex-col items-start gap-3"
               >
-                <div
-                  className={cn(
-                    "max-w-[85%] rounded-3xl px-4 py-2.5",
-                    isUser
-                      ? "bg-primary text-primary-foreground"
-                      : "bg-muted text-foreground",
-                  )}
-                >
-                  {isUser ? (
-                    <p className="whitespace-pre-wrap text-sm leading-relaxed wrap-break-word">
-                      {text}
-                    </p>
-                  ) : text ? (
-                    <AssistantMarkdown text={text} />
-                  ) : isBusy ? (
-                    <span className="inline-flex items-center gap-2 text-sm text-muted-foreground">
-                      <Loader2Icon className="size-4 animate-spin" />
-                      Thinking…
-                    </span>
-                  ) : null}
-                </div>
+                {message.parts.map((part, index) => {
+                  if (part.type === "text" && part.text) {
+                    return (
+                      <div
+                        key={`${message.id}-text-${index}`}
+                        className="max-w-[85%] rounded-3xl bg-muted px-4 py-2.5 text-foreground"
+                      >
+                        <AssistantMarkdown text={part.text} />
+                      </div>
+                    );
+                  }
+
+                  if (part.type === "tool-extractInvoice") {
+                    return (
+                      <div key={part.toolCallId} className="w-full max-w-xl">
+                        <ExtractInvoicePart part={part} />
+                      </div>
+                    );
+                  }
+
+                  return null;
+                })}
+                {!hasContent && isBusy ? (
+                  <div className="inline-flex items-center gap-2 rounded-3xl bg-muted px-4 py-2.5 text-sm text-muted-foreground">
+                    <Loader2Icon className="size-4 animate-spin" />
+                    Thinking…
+                  </div>
+                ) : null}
               </div>
             );
           })
