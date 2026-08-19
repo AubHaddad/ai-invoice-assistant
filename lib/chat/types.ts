@@ -13,6 +13,8 @@ import type {
 } from "@/lib/invoices/categories";
 import type {
   ExtractInvoiceResult,
+  GenerateReportInput,
+  GenerateReportResult,
   QueryInvoicesInput,
   QueryInvoicesResult,
 } from "@/lib/invoices/types";
@@ -31,6 +33,10 @@ export type InvoiceAssistantTools = {
   queryInvoices: {
     input: QueryInvoicesInput;
     output: QueryInvoicesResult;
+  };
+  generateReport: {
+    input: GenerateReportInput;
+    output: GenerateReportResult;
   };
   calculate: {
     input: CalculateInput;

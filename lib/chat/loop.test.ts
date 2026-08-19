@@ -42,6 +42,7 @@ describe("AGENT_TIMEOUT", () => {
   it("sets a default tool timeout and per-tool overrides", () => {
     expect(AGENT_TIMEOUT.toolMs).toBeGreaterThan(0);
     expect(AGENT_TIMEOUT.tools.queryInvoicesMs).toBeGreaterThan(0);
+    expect(AGENT_TIMEOUT.tools.generateReportMs).toBeGreaterThan(0);
     expect(AGENT_TIMEOUT.tools.calculateMs).toBeLessThan(
       AGENT_TIMEOUT.tools.extractInvoiceMs,
     );

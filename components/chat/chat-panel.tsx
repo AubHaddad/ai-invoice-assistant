@@ -4,7 +4,6 @@ import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
 import {
   ArrowUpIcon,
-  FileTextIcon,
   Loader2Icon,
   PaperclipIcon,
   SquareIcon,
@@ -22,16 +21,14 @@ import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { ComposerUploads } from "@/components/chat/composer-uploads";
 import { useComposerUploads } from "@/components/chat/use-composer-uploads";
-import { CalculateCard } from "@/components/chat/calculate-card";
-import { CategorizeCard } from "@/components/chat/categorize-card";
-import { CurrencyConversionCard } from "@/components/chat/currency-conversion-card";
-import { InvoiceCard } from "@/components/chat/invoice-card";
-import { InvoiceQueryCard } from "@/components/chat/invoice-query-card";
+import { InvoiceReviewCard } from "@/components/chat/invoice-review-card";
+import { ToolPart, isRenderableToolPart, type ExtractInvoiceToolPart } from "@/components/chat/tool-part";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import type { InvoiceAssistantUIMessage } from "@/lib/chat/types";
 import { getMessageText } from "@/lib/chat/message-text";
 import {
+  ExtractInvoiceResultSchema,
   invoiceSavedSystemText,
   type SavedInvoice,
 } from "@/lib/invoices/types";
@@ -81,11 +78,6 @@ function createUuid() {
   return crypto.randomUUID();
 }
 
-type ExtractInvoiceToolPart = Extract<
-  InvoiceAssistantUIMessage["parts"][number],
-  { type: "tool-extractInvoice" }
->;
-
 function latestSuccessfulExtract(messages: InvoiceAssistantUIMessage[]) {
   for (let index = messages.length - 1; index >= 0; index -= 1) {
     const message = messages[index];
@@ -93,189 +85,19 @@ function latestSuccessfulExtract(messages: InvoiceAssistantUIMessage[]) {
     for (let partIndex = message.parts.length - 1; partIndex >= 0; partIndex -= 1) {
       const part = message.parts[partIndex];
 
-      if (
-        part.type === "tool-extractInvoice" &&
-        part.state === "output-available" &&
-        part.output.ok
-      ) {
+      if (part.type !== "tool-extractInvoice" || part.state !== "output-available") {
+        continue;
+      }
+
+      const parsed = ExtractInvoiceResultSchema.safeParse(part.output);
+
+      if (parsed.success && parsed.data.ok) {
         return part;
       }
     }
   }
 
   return null;
-}
-
-function ExtractInvoicePart({
-  part,
-  isReviewing,
-  onReview,
-}: {
-  part: ExtractInvoiceToolPart;
-  isReviewing: boolean;
-  onReview: () => void;
-}) {
-  switch (part.state) {
-    case "input-streaming":
-    case "input-available":
-      return (
-        <div className="inline-flex items-center gap-2 text-sm text-muted-foreground">
-          <Loader2Icon className="size-4 animate-spin" />
-          Extracting invoice…
-        </div>
-      );
-    case "output-available":
-      if (!part.output.ok) {
-        return (
-          <p className="text-sm text-destructive">{part.output.error}</p>
-        );
-      }
-
-      return (
-        <div className="inline-flex max-w-full items-center gap-3 rounded-3xl border bg-background px-3 py-2 text-sm">
-          <FileTextIcon className="size-4 shrink-0 text-muted-foreground" />
-          <span className="min-w-0 truncate">
-            Extracted {part.output.fileName}
-          </span>
-          <Button
-            type="button"
-            size="xs"
-            variant={isReviewing ? "secondary" : "ghost"}
-            onClick={onReview}
-          >
-            {isReviewing ? "Reviewing" : "Review"}
-          </Button>
-        </div>
-      );
-    case "output-error":
-      return (
-        <p className="text-sm text-destructive">
-          {part.errorText || "Extraction failed."}
-        </p>
-      );
-    default:
-      return null;
-  }
-}
-
-function QueryInvoicesPart({
-  part,
-}: {
-  part: Extract<
-    InvoiceAssistantUIMessage["parts"][number],
-    { type: "tool-queryInvoices" }
-  >;
-}) {
-  switch (part.state) {
-    case "input-streaming":
-    case "input-available":
-      return (
-        <div className="inline-flex items-center gap-2 text-sm text-muted-foreground">
-          <Loader2Icon className="size-4 animate-spin" />
-          Searching invoices…
-        </div>
-      );
-    case "output-available":
-      return <InvoiceQueryCard result={part.output} />;
-    case "output-error":
-      return (
-        <p className="text-sm text-destructive">
-          {part.errorText || "Could not search invoices."}
-        </p>
-      );
-    default:
-      return null;
-  }
-}
-
-function CalculatePart({
-  part,
-}: {
-  part: Extract<
-    InvoiceAssistantUIMessage["parts"][number],
-    { type: "tool-calculate" }
-  >;
-}) {
-  switch (part.state) {
-    case "input-streaming":
-    case "input-available":
-      return (
-        <div className="inline-flex items-center gap-2 text-sm text-muted-foreground">
-          <Loader2Icon className="size-4 animate-spin" />
-          Calculating…
-        </div>
-      );
-    case "output-available":
-      return <CalculateCard result={part.output} />;
-    case "output-error":
-      return (
-        <p className="text-sm text-destructive">
-          {part.errorText || "Calculation failed."}
-        </p>
-      );
-    default:
-      return null;
-  }
-}
-
-function ConvertCurrencyPart({
-  part,
-}: {
-  part: Extract<
-    InvoiceAssistantUIMessage["parts"][number],
-    { type: "tool-convertCurrency" }
-  >;
-}) {
-  switch (part.state) {
-    case "input-streaming":
-    case "input-available":
-      return (
-        <div className="inline-flex items-center gap-2 text-sm text-muted-foreground">
-          <Loader2Icon className="size-4 animate-spin" />
-          Converting currency…
-        </div>
-      );
-    case "output-available":
-      return <CurrencyConversionCard result={part.output} />;
-    case "output-error":
-      return (
-        <p className="text-sm text-destructive">
-          {part.errorText || "Currency conversion failed."}
-        </p>
-      );
-    default:
-      return null;
-  }
-}
-
-function CategorizeExpensePart({
-  part,
-}: {
-  part: Extract<
-    InvoiceAssistantUIMessage["parts"][number],
-    { type: "tool-categorizeExpense" }
-  >;
-}) {
-  switch (part.state) {
-    case "input-streaming":
-    case "input-available":
-      return (
-        <div className="inline-flex items-center gap-2 text-sm text-muted-foreground">
-          <Loader2Icon className="size-4 animate-spin" />
-          Categorizing expense…
-        </div>
-      );
-    case "output-available":
-      return <CategorizeCard result={part.output} />;
-    case "output-error":
-      return (
-        <p className="text-sm text-destructive">
-          {part.errorText || "Could not categorize expense."}
-        </p>
-      );
-    default:
-      return null;
-  }
 }
 
 type ChatPanelProps = {
@@ -432,6 +254,11 @@ export function ChatPanel({
     }
   }
 
+  const reviewResult =
+    reviewPart?.state === "output-available"
+      ? ExtractInvoiceResultSchema.safeParse(reviewPart.output)
+      : null;
+
   return (
     <div className="flex min-h-0 min-w-0 flex-1">
       <div
@@ -475,12 +302,7 @@ export function ChatPanel({
 
             const hasContent = message.parts.some(
               (part) =>
-                (part.type === "text" && part.text) ||
-                part.type === "tool-extractInvoice" ||
-                part.type === "tool-queryInvoices" ||
-                part.type === "tool-calculate" ||
-                part.type === "tool-convertCurrency" ||
-                part.type === "tool-categorizeExpense",
+                (part.type === "text" && part.text) || isRenderableToolPart(part),
             );
 
             return (
@@ -500,48 +322,17 @@ export function ChatPanel({
                     );
                   }
 
-                  if (part.type === "tool-extractInvoice") {
-                    return (
-                      <div key={part.toolCallId}>
-                        <ExtractInvoicePart
-                          part={part}
-                          isReviewing={
-                            reviewOpen && reviewPart?.toolCallId === part.toolCallId
-                          }
-                          onReview={() => openReview(part)}
-                        />
-                      </div>
-                    );
-                  }
-
-                  if (part.type === "tool-queryInvoices") {
+                  if (isRenderableToolPart(part)) {
                     return (
                       <div key={part.toolCallId} className="w-full max-w-xl">
-                        <QueryInvoicesPart part={part} />
-                      </div>
-                    );
-                  }
-
-                  if (part.type === "tool-calculate") {
-                    return (
-                      <div key={part.toolCallId}>
-                        <CalculatePart part={part} />
-                      </div>
-                    );
-                  }
-
-                  if (part.type === "tool-convertCurrency") {
-                    return (
-                      <div key={part.toolCallId}>
-                        <ConvertCurrencyPart part={part} />
-                      </div>
-                    );
-                  }
-
-                  if (part.type === "tool-categorizeExpense") {
-                    return (
-                      <div key={part.toolCallId}>
-                        <CategorizeExpensePart part={part} />
+                        <ToolPart
+                          part={part}
+                          isReviewing={
+                            reviewOpen &&
+                            reviewPart?.toolCallId === part.toolCallId
+                          }
+                          onReview={openReview}
+                        />
                       </div>
                     );
                   }
@@ -653,7 +444,7 @@ export function ChatPanel({
       </form>
       </div>
 
-      {reviewOpen && reviewPart?.state === "output-available" ? (
+      {reviewOpen && reviewPart && reviewResult?.success ? (
         <aside className="flex min-h-0 w-full shrink-0 flex-col border-l bg-background md:w-md">
           <div className="flex items-center justify-between gap-3 border-b px-4 py-3">
             <p className="font-heading text-sm font-medium">Invoice review</p>
@@ -668,9 +459,9 @@ export function ChatPanel({
             </Button>
           </div>
           <div className="min-h-0 flex-1 overflow-y-auto p-4">
-            <InvoiceCard
+            <InvoiceReviewCard
               key={reviewPart.toolCallId}
-              result={reviewPart.output}
+              result={reviewResult.data}
               conversationId={conversationId}
               onSaved={onInvoiceSaved}
               onDiscard={closeReview}

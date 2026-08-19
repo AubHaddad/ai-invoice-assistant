@@ -1,36 +1,46 @@
 import { z } from "zod";
 import { ExpenseCategorySchema, type ExpenseCategory } from "./categories";
-import type { Invoice } from "@/lib/schemas";
+import { InvoiceSchema } from "@/lib/schemas";
 
-export type InvoiceExtractionPath = "text" | "vision" | "mixed";
+export const InvoiceExtractionPathSchema = z.enum(["text", "vision", "mixed"]);
 
-export type ExtractInvoiceSuccess = {
-  ok: true;
-  documentId: string;
-  fileName: string;
-  extractionPath: InvoiceExtractionPath;
-  invoice: Invoice;
-  notes: string;
-};
+export type InvoiceExtractionPath = z.infer<typeof InvoiceExtractionPathSchema>;
 
-export type ExtractInvoiceUnreadable = {
-  ok: false;
-  code: "unreadable";
-  error: string;
-  documentId: string;
-  fileName: string;
-};
+export const ExtractInvoiceSuccessSchema = z.object({
+  ok: z.literal(true),
+  documentId: z.string(),
+  fileName: z.string(),
+  extractionPath: InvoiceExtractionPathSchema,
+  invoice: InvoiceSchema,
+  notes: z.string(),
+});
 
-export type ExtractInvoiceFailure = {
-  ok: false;
-  code?: "error";
-  error: string;
-};
+export const ExtractInvoiceUnreadableSchema = z.object({
+  ok: z.literal(false),
+  code: z.literal("unreadable"),
+  error: z.string(),
+  documentId: z.string(),
+  fileName: z.string(),
+});
 
-export type ExtractInvoiceResult =
-  | ExtractInvoiceSuccess
-  | ExtractInvoiceUnreadable
-  | ExtractInvoiceFailure;
+export const ExtractInvoiceFailureSchema = z.object({
+  ok: z.literal(false),
+  code: z.literal("error").optional(),
+  error: z.string(),
+});
+
+export const ExtractInvoiceResultSchema = z.union([
+  ExtractInvoiceSuccessSchema,
+  ExtractInvoiceUnreadableSchema,
+  ExtractInvoiceFailureSchema,
+]);
+
+export type ExtractInvoiceSuccess = z.infer<typeof ExtractInvoiceSuccessSchema>;
+export type ExtractInvoiceUnreadable = z.infer<
+  typeof ExtractInvoiceUnreadableSchema
+>;
+export type ExtractInvoiceFailure = z.infer<typeof ExtractInvoiceFailureSchema>;
+export type ExtractInvoiceResult = z.infer<typeof ExtractInvoiceResultSchema>;
 
 export type SavedInvoice = {
   invoiceId: string;
@@ -99,25 +109,62 @@ export const QueryInvoicesInputSchema = z.object({
 
 export type QueryInvoicesInput = z.infer<typeof QueryInvoicesInputSchema>;
 
-export type QueriedInvoice = {
-  id: string;
-  vendor: string;
-  invoiceNumber: string;
-  issueDate: string;
-  dueDate: string | null;
-  category: ExpenseCategory | null;
-  currency: string;
-  total: number;
-};
+export const QueriedInvoiceSchema = z.object({
+  id: z.string(),
+  vendor: z.string(),
+  invoiceNumber: z.string(),
+  issueDate: z.string(),
+  dueDate: z.string().nullable(),
+  category: ExpenseCategorySchema.nullable(),
+  currency: z.string(),
+  total: z.number(),
+});
 
-export type QueryInvoicesResult = {
-  invoices: QueriedInvoice[];
-  summary: {
-    count: number;
-    sum: number;
-    currency: string | null;
-    returned: number;
-  };
-};
+export const QueryInvoicesResultSchema = z.object({
+  invoices: z.array(QueriedInvoiceSchema),
+  summary: z.object({
+    count: z.number(),
+    sum: z.number(),
+    currency: z.string().nullable(),
+    returned: z.number(),
+  }),
+});
+
+export type QueriedInvoice = z.infer<typeof QueriedInvoiceSchema>;
+export type QueryInvoicesResult = z.infer<typeof QueryInvoicesResultSchema>;
+
+export const ReportGroupBySchema = z.enum(["category", "month", "vendor"]);
+
+export type ReportGroupBy = z.infer<typeof ReportGroupBySchema>;
+
+export const GenerateReportInputSchema = QueryInvoicesInputSchema.omit({
+  limit: true,
+}).extend({
+  groupBy: ReportGroupBySchema.default("category").describe(
+    "How to group spend: category, calendar month (YYYY-MM), or vendor",
+  ),
+});
+
+export type GenerateReportInput = z.infer<typeof GenerateReportInputSchema>;
+
+export const ReportPointSchema = z.object({
+  label: z.string(),
+  amount: z.number(),
+  count: z.number(),
+  currency: z.string(),
+});
+
+export const GenerateReportResultSchema = z.object({
+  groupBy: ReportGroupBySchema,
+  points: z.array(ReportPointSchema),
+  summary: z.object({
+    count: z.number(),
+    sum: z.number(),
+    currency: z.string().nullable(),
+  }),
+});
+
+export type ReportPoint = z.infer<typeof ReportPointSchema>;
+export type GenerateReportResult = z.infer<typeof GenerateReportResultSchema>;
 
 export { DEFAULT_QUERY_LIMIT, MAX_QUERY_LIMIT };

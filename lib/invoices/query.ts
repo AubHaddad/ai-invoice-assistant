@@ -27,7 +27,7 @@ function toNumber(value: string | number | null | undefined) {
   return Number.isFinite(parsed) ? roundMoney(parsed) : 0;
 }
 
-function invoiceWhere(userId: string, input: QueryInvoicesInput): SQL {
+export function invoiceWhere(userId: string, input: QueryInvoicesInput): SQL {
   const conditions: SQL[] = [eq(invoices.userId, userId)];
 
   if (input.vendor) {

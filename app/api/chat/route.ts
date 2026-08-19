@@ -186,6 +186,7 @@ export async function POST(req: Request) {
         toolsContext: {
           extractInvoice: { userId },
           queryInvoices: { userId },
+          generateReport: { userId },
         },
         timeout: AGENT_TIMEOUT,
         stopWhen: isStepCount(MAX_AGENT_STEPS),

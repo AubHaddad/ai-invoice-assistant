@@ -7,6 +7,7 @@ export const AGENT_TIMEOUT = {
   toolMs: 8_000,
   tools: {
     queryInvoicesMs: 8_000,
+    generateReportMs: 8_000,
     calculateMs: 2_000,
     convertCurrencyMs: 5_000,
     extractInvoiceMs: 45_000,

@@ -1,27 +1,7 @@
-"use client";
-
 import type { QueryInvoicesResult } from "@/lib/invoices/types";
+import { formatMoney } from "@/lib/money/format";
 
-function formatMoney(amount: number, currency: string | null) {
-  if (!currency) {
-    return amount.toFixed(2);
-  }
-
-  try {
-    return new Intl.NumberFormat(undefined, {
-      style: "currency",
-      currency,
-    }).format(amount);
-  } catch {
-    return `${amount.toFixed(2)} ${currency}`;
-  }
-}
-
-export function InvoiceQueryCard({
-  result,
-}: {
-  result: QueryInvoicesResult;
-}) {
+export function SpendingTable({ result }: { result: QueryInvoicesResult }) {
   const { invoices, summary } = result;
 
   return (
