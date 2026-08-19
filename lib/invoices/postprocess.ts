@@ -109,7 +109,6 @@ export function mergePageExtractions(
     subtotal: totalsSource.subtotal,
     tax: totalsSource.tax,
     total: totalsSource.total,
-    category: header.category ?? totalsSource.category,
     confidence:
       readable.reduce((sum, page) => sum + page.confidence, 0) / readable.length,
     lineItems,

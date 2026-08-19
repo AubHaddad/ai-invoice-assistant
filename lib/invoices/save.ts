@@ -13,6 +13,7 @@ import {
 } from "@/lib/db/schema";
 import { getDocumentForUser } from "@/lib/documents/store";
 import { InvoiceSchema, type Invoice } from "@/lib/schemas";
+import { parseExpenseCategory } from "./categories";
 import { roundMoney } from "./postprocess";
 import type { SaveInvoiceResult } from "./types";
 
@@ -124,6 +125,7 @@ export async function saveInvoice({
       invoiceNumber: saved.invoiceNumber,
       total: saved.total,
       currency: saved.currency,
+      category: parseExpenseCategory(saved.category),
     };
   } catch (error) {
     console.error("Failed to save invoice", error);

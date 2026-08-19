@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { ExpenseCategorySchema, type ExpenseCategory } from "./categories";
 import type { Invoice } from "@/lib/schemas";
 
 export type InvoiceExtractionPath = "text" | "vision" | "mixed";
@@ -38,6 +39,7 @@ export type SavedInvoice = {
   invoiceNumber: string;
   total: number;
   currency: string;
+  category: ExpenseCategory | null;
 };
 
 export type SaveInvoiceResult =
@@ -45,7 +47,8 @@ export type SaveInvoiceResult =
   | { ok: false; error: string };
 
 export function invoiceSavedSystemText(saved: SavedInvoice) {
-  return `The user reviewed and saved invoice ${saved.invoiceNumber} from ${saved.vendor} (invoice id: ${saved.invoiceId}, document id: ${saved.documentId}). Total: ${saved.total} ${saved.currency}. Confirm the save briefly. You can reference this invoice by vendor, invoice number, or id.`;
+  const category = saved.category ? ` Category: ${saved.category}.` : "";
+  return `The user reviewed and saved invoice ${saved.invoiceNumber} from ${saved.vendor} (invoice id: ${saved.invoiceId}, document id: ${saved.documentId}). Total: ${saved.total} ${saved.currency}.${category} Confirm the save briefly. You can reference this invoice by vendor, invoice number, or id.`;
 }
 
 const DEFAULT_QUERY_LIMIT = 20;
@@ -66,12 +69,9 @@ export const QueryInvoicesInputSchema = z.object({
     .date()
     .optional()
     .describe("Inclusive issue-date end (YYYY-MM-DD)"),
-  category: z
-    .string()
-    .trim()
-    .min(1)
-    .optional()
-    .describe("Expense category to match (case-insensitive substring)"),
+  category: ExpenseCategorySchema.optional().describe(
+    "Expense category to match (software, travel, meals, office, telecom, marketing, or other)",
+  ),
   minAmount: z
     .number()
     .optional()
@@ -105,7 +105,7 @@ export type QueriedInvoice = {
   invoiceNumber: string;
   issueDate: string;
   dueDate: string | null;
-  category: string | null;
+  category: ExpenseCategory | null;
   currency: string;
   total: number;
 };

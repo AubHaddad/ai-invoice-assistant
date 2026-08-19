@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { ExpenseCategorySchema } from "@/lib/invoices/categories";
 
 const money = z
   .number()
@@ -26,10 +27,9 @@ export const InvoiceSchema = z.object({
   subtotal: money.describe("Sum of line items before tax"),
   tax: money.describe("Tax amount"),
   total: money.describe("Grand total including tax"),
-  category: z
-    .string()
-    .nullable()
-    .describe("Expense category, if classified"),
+  category: ExpenseCategorySchema.nullable().describe(
+    "Expense category, if classified",
+  ),
   confidence: z
     .number()
     .min(0)
@@ -41,8 +41,11 @@ export const InvoiceSchema = z.object({
   lineItems: z.array(LineItemSchema).describe("Invoice line items"),
 });
 
-/** Extraction-only shape: InvoiceSchema without `raw`, plus model notes. */
-export const InvoiceExtractionSchema = InvoiceSchema.omit({ raw: true }).extend({
+/** Extraction-only shape: InvoiceSchema without `raw`/`category`, plus model notes. */
+export const InvoiceExtractionSchema = InvoiceSchema.omit({
+  raw: true,
+  category: true,
+}).extend({
   unreadable: z
     .boolean()
     .describe(

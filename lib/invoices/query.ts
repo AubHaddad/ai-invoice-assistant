@@ -2,6 +2,7 @@ import { and, count, desc, eq, gte, ilike, lte, sum, type SQL } from "drizzle-or
 import "server-only";
 import { db } from "@/lib/db";
 import { invoices } from "@/lib/db/schema";
+import { parseExpenseCategory } from "./categories";
 import { roundMoney } from "./postprocess";
 import {
   DEFAULT_QUERY_LIMIT,
@@ -42,7 +43,7 @@ function invoiceWhere(userId: string, input: QueryInvoicesInput): SQL {
   }
 
   if (input.category) {
-    conditions.push(ilike(invoices.category, likeContains(input.category)));
+    conditions.push(eq(invoices.category, input.category));
   }
 
   if (input.minAmount != null) {
@@ -98,7 +99,10 @@ export async function queryInvoices({
     .limit(limit);
 
   return {
-    invoices: rows,
+    invoices: rows.map((row) => ({
+      ...row,
+      category: parseExpenseCategory(row.category),
+    })),
     summary: {
       count: groups.reduce((total, group) => total + group.count, 0),
       sum: roundMoney(

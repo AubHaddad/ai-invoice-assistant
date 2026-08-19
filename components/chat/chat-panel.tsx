@@ -23,6 +23,7 @@ import remarkGfm from "remark-gfm";
 import { ComposerUploads } from "@/components/chat/composer-uploads";
 import { useComposerUploads } from "@/components/chat/use-composer-uploads";
 import { CalculateCard } from "@/components/chat/calculate-card";
+import { CategorizeCard } from "@/components/chat/categorize-card";
 import { CurrencyConversionCard } from "@/components/chat/currency-conversion-card";
 import { InvoiceCard } from "@/components/chat/invoice-card";
 import { InvoiceQueryCard } from "@/components/chat/invoice-query-card";
@@ -247,6 +248,36 @@ function ConvertCurrencyPart({
   }
 }
 
+function CategorizeExpensePart({
+  part,
+}: {
+  part: Extract<
+    InvoiceAssistantUIMessage["parts"][number],
+    { type: "tool-categorizeExpense" }
+  >;
+}) {
+  switch (part.state) {
+    case "input-streaming":
+    case "input-available":
+      return (
+        <div className="inline-flex items-center gap-2 text-sm text-muted-foreground">
+          <Loader2Icon className="size-4 animate-spin" />
+          Categorizing expense…
+        </div>
+      );
+    case "output-available":
+      return <CategorizeCard result={part.output} />;
+    case "output-error":
+      return (
+        <p className="text-sm text-destructive">
+          {part.errorText || "Could not categorize expense."}
+        </p>
+      );
+    default:
+      return null;
+  }
+}
+
 type ChatPanelProps = {
   conversationId: string;
   initialMessages?: InvoiceAssistantUIMessage[];
@@ -448,7 +479,8 @@ export function ChatPanel({
                 part.type === "tool-extractInvoice" ||
                 part.type === "tool-queryInvoices" ||
                 part.type === "tool-calculate" ||
-                part.type === "tool-convertCurrency",
+                part.type === "tool-convertCurrency" ||
+                part.type === "tool-categorizeExpense",
             );
 
             return (
@@ -502,6 +534,14 @@ export function ChatPanel({
                     return (
                       <div key={part.toolCallId}>
                         <ConvertCurrencyPart part={part} />
+                      </div>
+                    );
+                  }
+
+                  if (part.type === "tool-categorizeExpense") {
+                    return (
+                      <div key={part.toolCallId}>
+                        <CategorizeExpensePart part={part} />
                       </div>
                     );
                   }

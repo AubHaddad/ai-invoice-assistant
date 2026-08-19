@@ -13,6 +13,11 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { saveInvoiceAction } from "@/lib/invoices/actions";
+import {
+  EXPENSE_CATEGORIES,
+  EXPENSE_CATEGORY_LABELS,
+  parseExpenseCategory,
+} from "@/lib/invoices/categories";
 import type {
   ExtractInvoiceResult,
   ExtractInvoiceSuccess,
@@ -108,7 +113,7 @@ function draftToInvoice(draft: InvoiceDraft, original: Invoice): Invoice {
     subtotal: parseNumber(draft.subtotal),
     tax: parseNumber(draft.tax),
     total: parseNumber(draft.total),
-    category: draft.category.trim() ? draft.category.trim() : null,
+    category: parseExpenseCategory(draft.category),
     confidence: original.confidence,
     raw: original.raw,
     lineItems,
@@ -390,7 +395,9 @@ function InvoiceReviewForm({
           <CardTitle>{savedInvoice.vendor}</CardTitle>
           <CardDescription>
             {savedInvoice.invoiceNumber}
-            {savedInvoice.category ? ` · ${savedInvoice.category}` : ""}
+            {savedInvoice.category
+              ? ` · ${EXPENSE_CATEGORY_LABELS[savedInvoice.category]}`
+              : ""}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
@@ -465,12 +472,19 @@ function InvoiceReviewForm({
             />
           </Field>
           <Field label="Category" className="col-span-2">
-            <Input
+            <select
               value={draft.category}
               onChange={(event) => updateField("category", event.target.value)}
-              className="h-8 rounded-xl"
+              className="h-8 w-full min-w-0 rounded-xl border border-transparent bg-input/50 px-3 py-1 text-sm outline-none transition-[color,box-shadow,background-color] focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30 disabled:cursor-not-allowed disabled:opacity-50"
               disabled={isPending}
-            />
+            >
+              <option value="">Uncategorized</option>
+              {EXPENSE_CATEGORIES.map((category) => (
+                <option key={category} value={category}>
+                  {EXPENSE_CATEGORY_LABELS[category]}
+                </option>
+              ))}
+            </select>
           </Field>
           <Field label="Subtotal">
             <Input

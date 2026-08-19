@@ -57,7 +57,7 @@ async function seed() {
     subtotal: 1200,
     tax: 120,
     total: 1320,
-    category: "Software",
+    category: "software",
     confidence: 0.96,
     raw: {
       vendorName: "Acme Corp",

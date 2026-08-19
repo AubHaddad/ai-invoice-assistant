@@ -21,6 +21,7 @@ import {
   type PdfPageImage,
   type PdfPageText,
 } from "./pdf";
+import { categorizeExpense, descriptionFromLineItems } from "./categorize";
 import {
   appendNote,
   mergeLineItems,
@@ -72,9 +73,29 @@ function toInvoice(extraction: InvoiceExtraction): Invoice {
   const { notes: _notes, unreadable: _unreadable, ...fields } = extraction;
   return InvoiceSchema.parse({
     ...fields,
+    category: null,
     lineItems: mergeLineItems(fields.lineItems),
     raw: extraction,
   });
+}
+
+async function classifyInvoice(
+  invoice: Invoice,
+  abortSignal?: AbortSignal,
+): Promise<Invoice> {
+  const result = await categorizeExpense(
+    {
+      description: descriptionFromLineItems(invoice.lineItems, invoice.vendor),
+      vendor: invoice.vendor,
+    },
+    { abortSignal },
+  );
+
+  if (!result.ok) {
+    return invoice;
+  }
+
+  return { ...invoice, category: result.category };
 }
 
 function finalizeExtraction(extraction: InvoiceExtraction) {
@@ -378,7 +399,7 @@ export async function extractInvoiceFromDocument({
         documentId: document.id,
         fileName: document.fileName,
         extractionPath,
-        invoice: toInvoice(finalized),
+        invoice: await classifyInvoice(toInvoice(finalized), abortSignal),
         notes: finalized.notes,
       };
     }
@@ -416,7 +437,7 @@ export async function extractInvoiceFromDocument({
       documentId: document.id,
       fileName: document.fileName,
       extractionPath: "vision",
-      invoice: toInvoice(finalized),
+      invoice: await classifyInvoice(toInvoice(finalized), abortSignal),
       notes: finalized.notes,
     };
   } catch (error) {

@@ -8,6 +8,10 @@ import type {
   ConvertCurrencyResult,
 } from "@/lib/money/convert";
 import type {
+  CategorizeExpenseInput,
+  CategorizeExpenseResult,
+} from "@/lib/invoices/categories";
+import type {
   ExtractInvoiceResult,
   QueryInvoicesInput,
   QueryInvoicesResult,
@@ -35,6 +39,10 @@ export type InvoiceAssistantTools = {
   convertCurrency: {
     input: ConvertCurrencyInput;
     output: ConvertCurrencyResult;
+  };
+  categorizeExpense: {
+    input: CategorizeExpenseInput;
+    output: CategorizeExpenseResult;
   };
 };
 
