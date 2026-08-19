@@ -11,6 +11,10 @@ export const relations = defineRelations(schema, (r) => ({
       from: r.users.id,
       to: r.accounts.userId,
     }),
+    documents: r.many.documents({
+      from: r.users.id,
+      to: r.documents.userId,
+    }),
   },
   accounts: {
     user: r.one.users({
@@ -37,6 +41,10 @@ export const relations = defineRelations(schema, (r) => ({
       from: r.conversations.id,
       to: r.messages.conversationId,
     }),
+    documents: r.many.documents({
+      from: r.conversations.id,
+      to: r.documents.conversationId,
+    }),
     invoiceLinks: r.many.conversationInvoices({
       from: r.conversations.id,
       to: r.conversationInvoices.conversationId,
@@ -44,6 +52,16 @@ export const relations = defineRelations(schema, (r) => ({
     invoices: r.many.invoices({
       from: r.conversations.id.through(r.conversationInvoices.conversationId),
       to: r.invoices.id.through(r.conversationInvoices.invoiceId),
+    }),
+  },
+  documents: {
+    user: r.one.users({
+      from: r.documents.userId,
+      to: r.users.id,
+    }),
+    conversation: r.one.conversations({
+      from: r.documents.conversationId,
+      to: r.conversations.id,
     }),
   },
   conversationInvoices: {

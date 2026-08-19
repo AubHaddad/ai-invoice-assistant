@@ -28,6 +28,12 @@ export const invoiceStatusEnum = pgEnum("invoice_status", [
   "failed",
 ]);
 
+export const documentStatusEnum = pgEnum("document_status", [
+  "uploading",
+  "uploaded",
+  "failed",
+]);
+
 export const messageRoleEnum = pgEnum("message_role", [
   "user",
   "assistant",
@@ -130,6 +136,31 @@ export const conversations = snakeCase.table(
   (table) => [index("conversations_user_id_idx").on(table.userId)],
 );
 
+export const documents = snakeCase.table(
+  "documents",
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    userId: uuid()
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    conversationId: uuid().references(() => conversations.id, {
+      onDelete: "set null",
+    }),
+    fileName: text().notNull(),
+    mimeType: text().notNull(),
+    sizeBytes: integer().notNull(),
+    storageKey: text().notNull(),
+    status: documentStatusEnum().notNull().default("uploading"),
+    ...timestamps,
+  },
+  (table) => [
+    index("documents_user_id_idx").on(table.userId),
+    index("documents_conversation_id_idx").on(table.conversationId),
+    index("documents_status_idx").on(table.status),
+    index("documents_storage_key_idx").on(table.storageKey),
+  ],
+);
+
 export const conversationInvoices = snakeCase.table(
   "conversation_invoices",
   {
@@ -166,6 +197,8 @@ export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
 export type Account = typeof accounts.$inferSelect;
 export type NewAccount = typeof accounts.$inferInsert;
+export type Document = typeof documents.$inferSelect;
+export type NewDocument = typeof documents.$inferInsert;
 export type Invoice = typeof invoices.$inferSelect;
 export type NewInvoice = typeof invoices.$inferInsert;
 export type Conversation = typeof conversations.$inferSelect;
