@@ -26,6 +26,7 @@ import { ToolPart, isRenderableToolPart, type ExtractInvoiceToolPart } from "@/c
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import type { InvoiceAssistantUIMessage } from "@/lib/chat/types";
+import { getChatErrorBannerMessage } from "@/lib/chat/error-message";
 import { getMessageText } from "@/lib/chat/message-text";
 import {
   ExtractInvoiceResultSchema,
@@ -267,6 +268,24 @@ export function ChatPanel({
           reviewOpen ? "hidden md:flex" : "flex",
         )}
       >
+      {error ? (
+        <div
+          role="alert"
+          className="flex items-start justify-between gap-3 border-b bg-destructive/10 px-4 py-3 text-sm text-destructive"
+        >
+          <p>{getChatErrorBannerMessage(error)}</p>
+          <Button
+            type="button"
+            size="icon-sm"
+            variant="ghost"
+            aria-label="Dismiss error"
+            className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+            onClick={() => clearError()}
+          >
+            <XIcon />
+          </Button>
+        </div>
+      ) : null}
       <div
         ref={listRef}
         className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-4 py-6"
@@ -360,9 +379,6 @@ export function ChatPanel({
           </div>
         ) : null}
 
-        {error ? (
-          <p className="text-sm text-destructive">Something went wrong.</p>
-        ) : null}
       </div>
 
       <form

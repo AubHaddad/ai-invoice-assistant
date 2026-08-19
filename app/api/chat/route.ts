@@ -33,6 +33,12 @@ import {
   listUploadedDocumentsForConversation,
 } from "@/lib/documents/store";
 import { langfuseSpanProcessor } from "@/lib/observability/langfuse";
+import {
+  ChatLimitError,
+  chatLimitResponse,
+  enforceChatLimits,
+  recordChatTokenUsage,
+} from "@/lib/rate-limit";
 
 export const maxDuration = 60;
 
@@ -70,6 +76,17 @@ export async function POST(req: Request) {
 
   if (!userId) {
     return new Response("Unauthorized", { status: 401 });
+  }
+
+  try {
+    const { pending } = await enforceChatLimits(userId);
+    after(() => pending);
+  } catch (error) {
+    if (error instanceof ChatLimitError) {
+      return chatLimitResponse(error);
+    }
+
+    throw error;
   }
 
   const body = (await req.json()) as {
@@ -222,19 +239,30 @@ export async function POST(req: Request) {
           originalMessages: messages,
           generateMessageId: () => crypto.randomUUID(),
           onFinish: async ({ responseMessage, isContinuation }) => {
-            try {
-              const resolvedUsage =
-                usage ??
-                (await Promise.resolve(result.usage).catch(() => undefined));
+            const resolvedUsage =
+              usage ??
+              (await Promise.resolve(result.usage).catch(() => undefined));
+            const tokenCounts = tokenCountsFromUsage(resolvedUsage);
+            const tokensUsed =
+              (tokenCounts.tokensIn ?? 0) + (tokenCounts.tokensOut ?? 0);
 
+            try {
               await saveAssistantMessage({
                 conversationId,
                 message: responseMessage,
-                ...tokenCountsFromUsage(resolvedUsage),
+                ...tokenCounts,
                 isContinuation,
               });
             } catch (error) {
               console.error("Failed to persist assistant message", error);
+            }
+
+            if (tokensUsed > 0) {
+              try {
+                await recordChatTokenUsage(userId, tokensUsed);
+              } catch (error) {
+                console.error("Failed to record chat token usage", error);
+              }
             }
           },
         }),
