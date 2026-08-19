@@ -8,14 +8,8 @@ import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { getMessageText } from "@/lib/chat/message-text";
 import { cn } from "@/lib/utils";
-
-function getMessageText(message: UIMessage) {
-  return message.parts
-    .filter((part) => part.type === "text")
-    .map((part) => part.text)
-    .join("");
-}
 
 function AssistantMarkdown({ text }: { text: string }) {
   return (
@@ -57,13 +51,33 @@ function AssistantMarkdown({ text }: { text: string }) {
   );
 }
 
-export function ChatPanel() {
+function createUuid() {
+  return crypto.randomUUID();
+}
+
+type ChatPanelProps = {
+  conversationId: string;
+  initialMessages?: UIMessage[];
+  onConversationUpdated?: () => void;
+};
+
+export function ChatPanel({
+  conversationId,
+  initialMessages,
+  onConversationUpdated,
+}: ChatPanelProps) {
   const [input, setInput] = useState("");
   const [transport] = useState(
     () => new DefaultChatTransport({ api: "/api/chat" }),
   );
   const { messages, sendMessage, status, stop, error } = useChat({
+    id: conversationId,
+    messages: initialMessages,
+    generateId: createUuid,
     transport,
+    onFinish: () => {
+      onConversationUpdated?.();
+    },
   });
 
   const listRef = useRef<HTMLDivElement>(null);

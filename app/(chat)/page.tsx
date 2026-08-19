@@ -1,9 +1,18 @@
-import { ChatPanel } from "@/components/chat/chat-panel";
+import { redirect } from "next/navigation";
+import { auth } from "@/auth";
+import { ChatApp } from "@/components/chat/chat-app";
+import { listConversations } from "@/lib/chat/store";
 
-export default function ChatPage() {
+export default async function ChatPage() {
+  const session = await auth();
+
+  if (!session?.user?.id) {
+    redirect("/login");
+  }
+
+  const conversations = await listConversations(session.user.id);
+
   return (
-    <main className="flex min-h-0 flex-1 flex-col">
-      <ChatPanel />
-    </main>
+    <ChatApp user={session.user} initialConversations={conversations} />
   );
 }
