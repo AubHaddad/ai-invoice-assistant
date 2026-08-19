@@ -178,6 +178,27 @@ export const conversationInvoices = snakeCase.table(
   ],
 );
 
+const fxRate = () => numeric({ precision: 18, scale: 8, mode: "string" });
+
+export const exchangeRates = snakeCase.table(
+  "exchange_rates",
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    fromCurrency: text().notNull(),
+    toCurrency: text().notNull(),
+    rate: fxRate().notNull(),
+    effectiveDate: date({ mode: "string" }).notNull(),
+    ...timestamps,
+  },
+  (table) => [
+    uniqueIndex("exchange_rates_pair_date_idx").on(
+      table.fromCurrency,
+      table.toCurrency,
+      table.effectiveDate,
+    ),
+  ],
+);
+
 export const messages = snakeCase.table(
   "messages",
   {
@@ -208,6 +229,8 @@ export type Conversation = typeof conversations.$inferSelect;
 export type NewConversation = typeof conversations.$inferInsert;
 export type Message = typeof messages.$inferSelect;
 export type NewMessage = typeof messages.$inferInsert;
+export type ExchangeRateRow = typeof exchangeRates.$inferSelect;
+export type NewExchangeRate = typeof exchangeRates.$inferInsert;
 
 type InvoiceInsertFields = Pick<
   NewInvoice,

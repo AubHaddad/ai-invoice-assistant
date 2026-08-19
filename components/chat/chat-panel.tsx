@@ -22,6 +22,8 @@ import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { ComposerUploads } from "@/components/chat/composer-uploads";
 import { useComposerUploads } from "@/components/chat/use-composer-uploads";
+import { CalculateCard } from "@/components/chat/calculate-card";
+import { CurrencyConversionCard } from "@/components/chat/currency-conversion-card";
 import { InvoiceCard } from "@/components/chat/invoice-card";
 import { InvoiceQueryCard } from "@/components/chat/invoice-query-card";
 import { Button } from "@/components/ui/button";
@@ -178,6 +180,66 @@ function QueryInvoicesPart({
       return (
         <p className="text-sm text-destructive">
           {part.errorText || "Could not search invoices."}
+        </p>
+      );
+    default:
+      return null;
+  }
+}
+
+function CalculatePart({
+  part,
+}: {
+  part: Extract<
+    InvoiceAssistantUIMessage["parts"][number],
+    { type: "tool-calculate" }
+  >;
+}) {
+  switch (part.state) {
+    case "input-streaming":
+    case "input-available":
+      return (
+        <div className="inline-flex items-center gap-2 text-sm text-muted-foreground">
+          <Loader2Icon className="size-4 animate-spin" />
+          Calculating…
+        </div>
+      );
+    case "output-available":
+      return <CalculateCard result={part.output} />;
+    case "output-error":
+      return (
+        <p className="text-sm text-destructive">
+          {part.errorText || "Calculation failed."}
+        </p>
+      );
+    default:
+      return null;
+  }
+}
+
+function ConvertCurrencyPart({
+  part,
+}: {
+  part: Extract<
+    InvoiceAssistantUIMessage["parts"][number],
+    { type: "tool-convertCurrency" }
+  >;
+}) {
+  switch (part.state) {
+    case "input-streaming":
+    case "input-available":
+      return (
+        <div className="inline-flex items-center gap-2 text-sm text-muted-foreground">
+          <Loader2Icon className="size-4 animate-spin" />
+          Converting currency…
+        </div>
+      );
+    case "output-available":
+      return <CurrencyConversionCard result={part.output} />;
+    case "output-error":
+      return (
+        <p className="text-sm text-destructive">
+          {part.errorText || "Currency conversion failed."}
         </p>
       );
     default:
@@ -384,7 +446,9 @@ export function ChatPanel({
               (part) =>
                 (part.type === "text" && part.text) ||
                 part.type === "tool-extractInvoice" ||
-                part.type === "tool-queryInvoices",
+                part.type === "tool-queryInvoices" ||
+                part.type === "tool-calculate" ||
+                part.type === "tool-convertCurrency",
             );
 
             return (
@@ -422,6 +486,22 @@ export function ChatPanel({
                     return (
                       <div key={part.toolCallId} className="w-full max-w-xl">
                         <QueryInvoicesPart part={part} />
+                      </div>
+                    );
+                  }
+
+                  if (part.type === "tool-calculate") {
+                    return (
+                      <div key={part.toolCallId}>
+                        <CalculatePart part={part} />
+                      </div>
+                    );
+                  }
+
+                  if (part.type === "tool-convertCurrency") {
+                    return (
+                      <div key={part.toolCallId}>
+                        <ConvertCurrencyPart part={part} />
                       </div>
                     );
                   }

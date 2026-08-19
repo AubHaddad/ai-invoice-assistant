@@ -1,5 +1,13 @@
 import type { UIMessage } from "ai";
 import type {
+  CalculateInput,
+  CalculateResult,
+} from "@/lib/money/calculate";
+import type {
+  ConvertCurrencyInput,
+  ConvertCurrencyResult,
+} from "@/lib/money/convert";
+import type {
   ExtractInvoiceResult,
   QueryInvoicesInput,
   QueryInvoicesResult,
@@ -19,6 +27,14 @@ export type InvoiceAssistantTools = {
   queryInvoices: {
     input: QueryInvoicesInput;
     output: QueryInvoicesResult;
+  };
+  calculate: {
+    input: CalculateInput;
+    output: CalculateResult;
+  };
+  convertCurrency: {
+    input: ConvertCurrencyInput;
+    output: ConvertCurrencyResult;
   };
 };
 

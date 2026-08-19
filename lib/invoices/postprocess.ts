@@ -1,10 +1,9 @@
 import type { InvoiceExtraction, LineItem } from "@/lib/schemas";
+import { roundMoney } from "@/lib/money/precision";
+
+export { roundMoney };
 
 export const TOTAL_RECONCILE_TOLERANCE = 0.02;
-
-export function roundMoney(value: number) {
-  return Math.round((value + Number.EPSILON) * 100) / 100;
-}
 
 export function mergeLineItems(items: LineItem[]): LineItem[] {
   const merged: LineItem[] = [];
