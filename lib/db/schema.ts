@@ -10,8 +10,10 @@ import {
   snakeCase,
   text,
   timestamp,
+  uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
+import type { Invoice, LineItem } from "@/lib/schemas";
 
 const timestamps = {
   createdAt: timestamp({ withTimezone: true }).defaultNow().notNull(),
@@ -21,12 +23,7 @@ const timestamps = {
     .$onUpdate(() => new Date()),
 };
 
-export const invoiceStatusEnum = pgEnum("invoice_status", [
-  "uploaded",
-  "processing",
-  "ready",
-  "failed",
-]);
+const money = () => numeric({ precision: 12, scale: 2, mode: "number" });
 
 export const documentStatusEnum = pgEnum("document_status", [
   "uploading",
@@ -40,24 +37,6 @@ export const messageRoleEnum = pgEnum("message_role", [
   "system",
   "tool",
 ]);
-
-export type InvoiceLineItem = {
-  description: string;
-  quantity?: number;
-  unitPrice?: number;
-  amount?: number;
-};
-
-export type ExtractedInvoiceData = {
-  vendorName?: string;
-  invoiceNumber?: string;
-  invoiceDate?: string;
-  currency?: string;
-  subtotal?: number;
-  tax?: number;
-  total?: number;
-  lineItems?: InvoiceLineItem[];
-};
 
 export type MessagePart = {
   type: string;
@@ -98,31 +77,6 @@ export const accounts = snakeCase.table(
   ],
 );
 
-export const invoices = snakeCase.table(
-  "invoices",
-  {
-    id: uuid().primaryKey().defaultRandom(),
-    fileName: text().notNull(),
-    mimeType: text().notNull(),
-    storageKey: text().notNull(),
-    status: invoiceStatusEnum().notNull().default("uploaded"),
-    vendorName: text(),
-    invoiceNumber: text(),
-    invoiceDate: date(),
-    currency: text().notNull().default("USD"),
-    subtotal: numeric({ precision: 12, scale: 2 }),
-    tax: numeric({ precision: 12, scale: 2 }),
-    total: numeric({ precision: 12, scale: 2 }),
-    extractedData: jsonb().$type<ExtractedInvoiceData>(),
-    errorMessage: text(),
-    ...timestamps,
-  },
-  (table) => [
-    index("invoices_status_idx").on(table.status),
-    index("invoices_vendor_name_idx").on(table.vendorName),
-  ],
-);
-
 export const conversations = snakeCase.table(
   "conversations",
   {
@@ -147,18 +101,65 @@ export const documents = snakeCase.table(
       onDelete: "set null",
     }),
     fileName: text().notNull(),
-    mimeType: text().notNull(),
+    mime: text().notNull(),
     sizeBytes: integer().notNull(),
-    storageKey: text().notNull(),
+    gcsPath: text().notNull(),
     status: documentStatusEnum().notNull().default("uploading"),
+    pages: integer(),
     ...timestamps,
   },
   (table) => [
     index("documents_user_id_idx").on(table.userId),
     index("documents_conversation_id_idx").on(table.conversationId),
     index("documents_status_idx").on(table.status),
-    index("documents_storage_key_idx").on(table.storageKey),
+    index("documents_gcs_path_idx").on(table.gcsPath),
   ],
+);
+
+export const invoices = snakeCase.table(
+  "invoices",
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    userId: uuid()
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    documentId: uuid()
+      .notNull()
+      .references(() => documents.id, { onDelete: "cascade" }),
+    vendor: text().notNull(),
+    invoiceNumber: text().notNull(),
+    issueDate: date({ mode: "string" }).notNull(),
+    dueDate: date({ mode: "string" }),
+    currency: text().notNull(),
+    subtotal: money().notNull(),
+    tax: money().notNull(),
+    total: money().notNull(),
+    category: text(),
+    confidence: numeric({ precision: 4, scale: 3, mode: "number" }).notNull(),
+    raw: jsonb().$type<Invoice["raw"]>().notNull(),
+    ...timestamps,
+  },
+  (table) => [
+    index("invoices_user_id_idx").on(table.userId),
+    uniqueIndex("invoices_document_id_idx").on(table.documentId),
+    index("invoices_vendor_idx").on(table.vendor),
+    index("invoices_invoice_number_idx").on(table.invoiceNumber),
+  ],
+);
+
+export const lineItems = snakeCase.table(
+  "line_items",
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    invoiceId: uuid()
+      .notNull()
+      .references(() => invoices.id, { onDelete: "cascade" }),
+    description: text().notNull(),
+    quantity: numeric({ precision: 12, scale: 4, mode: "number" }).notNull(),
+    unitPrice: money().notNull(),
+    amount: money().notNull(),
+  },
+  (table) => [index("line_items_invoice_id_idx").on(table.invoiceId)],
 );
 
 export const conversationInvoices = snakeCase.table(
@@ -199,9 +200,42 @@ export type Account = typeof accounts.$inferSelect;
 export type NewAccount = typeof accounts.$inferInsert;
 export type Document = typeof documents.$inferSelect;
 export type NewDocument = typeof documents.$inferInsert;
-export type Invoice = typeof invoices.$inferSelect;
+export type InvoiceRow = typeof invoices.$inferSelect;
 export type NewInvoice = typeof invoices.$inferInsert;
+export type LineItemRow = typeof lineItems.$inferSelect;
+export type NewLineItem = typeof lineItems.$inferInsert;
 export type Conversation = typeof conversations.$inferSelect;
 export type NewConversation = typeof conversations.$inferInsert;
 export type Message = typeof messages.$inferSelect;
 export type NewMessage = typeof messages.$inferInsert;
+
+type InvoiceInsertFields = Pick<
+  NewInvoice,
+  | "vendor"
+  | "invoiceNumber"
+  | "issueDate"
+  | "dueDate"
+  | "currency"
+  | "subtotal"
+  | "tax"
+  | "total"
+  | "category"
+  | "confidence"
+  | "raw"
+>;
+
+type LineItemInsertFields = Pick<
+  NewLineItem,
+  "description" | "quantity" | "unitPrice" | "amount"
+>;
+
+type AssertAssignable<T extends U, U> = T;
+
+type _InvoiceSchemaMatchesInsert = AssertAssignable<
+  Omit<Invoice, "lineItems">,
+  InvoiceInsertFields
+>;
+type _LineItemSchemaMatchesInsert = AssertAssignable<
+  LineItem,
+  LineItemInsertFields
+>;

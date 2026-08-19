@@ -9,9 +9,10 @@ export function toDocumentSummary(document: Document) {
   return {
     id: document.id,
     fileName: document.fileName,
-    mimeType: document.mimeType,
+    mimeType: document.mime,
     sizeBytes: document.sizeBytes,
     status: document.status,
+    pages: document.pages,
     conversationId: document.conversationId,
   };
 }
@@ -44,7 +45,7 @@ export async function createUploadingDocument({
     : null;
 
   const documentId = crypto.randomUUID();
-  const storageKey = buildDocumentStorageKey({
+  const gcsPath = buildDocumentStorageKey({
     userId,
     documentId,
     fileName,
@@ -57,9 +58,9 @@ export async function createUploadingDocument({
       userId,
       conversationId: conversation?.id ?? null,
       fileName,
-      mimeType,
+      mime: mimeType,
       sizeBytes,
-      storageKey,
+      gcsPath,
       status: "uploading",
     })
     .returning();

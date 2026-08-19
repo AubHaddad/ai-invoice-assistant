@@ -77,7 +77,7 @@ export async function POST(req: Request) {
 
   try {
     const uploadUrl = await createV4UploadUrl({
-      storageKey: document.storageKey,
+      storageKey: document.gcsPath,
       contentType: mimeType,
     });
 

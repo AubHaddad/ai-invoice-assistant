@@ -41,7 +41,7 @@ export async function POST(
     );
   }
 
-  const exists = await objectExists(document.storageKey);
+  const exists = await objectExists(document.gcsPath);
 
   if (!exists) {
     await markDocumentFailed(id, userId);

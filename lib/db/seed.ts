@@ -1,10 +1,14 @@
 import "dotenv/config";
 import { drizzle } from "drizzle-orm/node-postgres";
-import { eq, like } from "drizzle-orm";
+import { eq } from "drizzle-orm";
+import { InvoiceSchema } from "@/lib/schemas";
+import { invoiceInsertValues, lineItemInsertValues } from "./invoices";
 import {
   conversationInvoices,
   conversations,
+  documents,
   invoices,
+  lineItems,
   messages,
   users,
 } from "./schema";
@@ -21,7 +25,6 @@ const DEMO_EMAIL = "ada@invoice-assistant.dev";
 
 async function seed() {
   await db.delete(users).where(eq(users.email, DEMO_EMAIL));
-  await db.delete(invoices).where(like(invoices.storageKey, "seed/%"));
 
   const [user] = await db
     .insert(users)
@@ -32,39 +35,57 @@ async function seed() {
     })
     .returning();
 
-  const [invoice] = await db
-    .insert(invoices)
+  const [document] = await db
+    .insert(documents)
     .values({
+      userId: user.id,
       fileName: "acme-inv-1042.pdf",
-      mimeType: "application/pdf",
-      storageKey: "seed/acme-inv-1042.pdf",
-      status: "ready",
-      vendorName: "Acme Corp",
-      invoiceNumber: "INV-1042",
-      invoiceDate: "2026-08-01",
-      currency: "USD",
-      subtotal: "1200.00",
-      tax: "120.00",
-      total: "1320.00",
-      extractedData: {
-        vendorName: "Acme Corp",
-        invoiceNumber: "INV-1042",
-        invoiceDate: "2026-08-01",
-        currency: "USD",
-        subtotal: 1200,
-        tax: 120,
-        total: 1320,
-        lineItems: [
-          {
-            description: "API usage — August",
-            quantity: 1,
-            unitPrice: 1200,
-            amount: 1200,
-          },
-        ],
-      },
+      mime: "application/pdf",
+      sizeBytes: 24_576,
+      gcsPath: "seed/acme-inv-1042.pdf",
+      status: "uploaded",
+      pages: 1,
     })
     .returning();
+
+  const parsed = InvoiceSchema.parse({
+    vendor: "Acme Corp",
+    invoiceNumber: "INV-1042",
+    issueDate: "2026-08-01",
+    dueDate: "2026-08-31",
+    currency: "USD",
+    subtotal: 1200,
+    tax: 120,
+    total: 1320,
+    category: "Software",
+    confidence: 0.96,
+    raw: {
+      vendorName: "Acme Corp",
+      invoiceNumber: "INV-1042",
+    },
+    lineItems: [
+      {
+        description: "API usage — August",
+        quantity: 1,
+        unitPrice: 1200,
+        amount: 1200,
+      },
+    ],
+  });
+
+  const [invoice] = await db
+    .insert(invoices)
+    .values(
+      invoiceInsertValues(parsed, {
+        userId: user.id,
+        documentId: document.id,
+      }),
+    )
+    .returning();
+
+  await db
+    .insert(lineItems)
+    .values(lineItemInsertValues(parsed, invoice.id));
 
   const [conversation] = await db
     .insert(conversations)
@@ -130,7 +151,8 @@ async function seed() {
 
   console.log("Seeded demo data:");
   console.log(`  user:          ${user.email}`);
-  console.log(`  invoice:       ${invoice.invoiceNumber} (${invoice.vendorName})`);
+  console.log(`  document:      ${document.fileName} (${document.gcsPath})`);
+  console.log(`  invoice:       ${invoice.invoiceNumber} (${invoice.vendor})`);
   console.log(`  conversation:  ${conversation.title}`);
 }
 

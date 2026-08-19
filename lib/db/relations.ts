@@ -15,6 +15,10 @@ export const relations = defineRelations(schema, (r) => ({
       from: r.users.id,
       to: r.documents.userId,
     }),
+    invoices: r.many.invoices({
+      from: r.users.id,
+      to: r.invoices.userId,
+    }),
   },
   accounts: {
     user: r.one.users({
@@ -23,6 +27,18 @@ export const relations = defineRelations(schema, (r) => ({
     }),
   },
   invoices: {
+    user: r.one.users({
+      from: r.invoices.userId,
+      to: r.users.id,
+    }),
+    document: r.one.documents({
+      from: r.invoices.documentId,
+      to: r.documents.id,
+    }),
+    lineItems: r.many.lineItems({
+      from: r.invoices.id,
+      to: r.lineItems.invoiceId,
+    }),
     conversationLinks: r.many.conversationInvoices({
       from: r.invoices.id,
       to: r.conversationInvoices.invoiceId,
@@ -30,6 +46,12 @@ export const relations = defineRelations(schema, (r) => ({
     conversations: r.many.conversations({
       from: r.invoices.id.through(r.conversationInvoices.invoiceId),
       to: r.conversations.id.through(r.conversationInvoices.conversationId),
+    }),
+  },
+  lineItems: {
+    invoice: r.one.invoices({
+      from: r.lineItems.invoiceId,
+      to: r.invoices.id,
     }),
   },
   conversations: {
@@ -62,6 +84,10 @@ export const relations = defineRelations(schema, (r) => ({
     conversation: r.one.conversations({
       from: r.documents.conversationId,
       to: r.conversations.id,
+    }),
+    invoices: r.many.invoices({
+      from: r.documents.id,
+      to: r.invoices.documentId,
     }),
   },
   conversationInvoices: {
