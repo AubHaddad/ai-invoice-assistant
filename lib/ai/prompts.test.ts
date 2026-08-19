@@ -16,6 +16,12 @@ describe("SYSTEM_PROMPT", () => {
     expect(SYSTEM_PROMPT).toMatch(/cite the returned rate and rateDate/i);
   });
 
+  it("tells the model to explain tool errors instead of inventing results", () => {
+    expect(SYSTEM_PROMPT).toMatch(/error" field/i);
+    expect(SYSTEM_PROMPT).toMatch(/do not invent a substitute result/i);
+    expect(SYSTEM_PROMPT).toMatch(/retry the same tool once/i);
+  });
+
   it("asks for concise answers and tables when listing", () => {
     expect(SYSTEM_PROMPT).toMatch(/Be concise/);
     expect(SYSTEM_PROMPT).toMatch(/markdown table/i);

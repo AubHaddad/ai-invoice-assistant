@@ -12,6 +12,7 @@ import {
   lineItems,
 } from "@/lib/db/schema";
 import { getDocumentForUser } from "@/lib/documents/store";
+import { logFailureToLangfuse } from "@/lib/observability/log-failure";
 import { InvoiceSchema, type Invoice } from "@/lib/schemas";
 import { parseExpenseCategory } from "./categories";
 import { roundMoney } from "./postprocess";
@@ -129,6 +130,11 @@ export async function saveInvoice({
     };
   } catch (error) {
     console.error("Failed to save invoice", error);
+    logFailureToLangfuse({
+      source: "db",
+      error,
+      extra: { action: "saveInvoice" },
+    });
     return { ok: false, error: "Could not save invoice." };
   }
 }

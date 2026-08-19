@@ -1,6 +1,10 @@
 import { generateObject } from "ai";
 import "server-only";
 import { getModel } from "@/lib/ai/models";
+import { toPublicErrorMessage } from "@/lib/chat/error-message";
+import { AGENT_TIMEOUT } from "@/lib/chat/loop";
+import { logFailureToLangfuse } from "@/lib/observability/log-failure";
+import { abortAfter } from "@/lib/timeout";
 import {
   CATEGORIZE_TEST_SET,
   CategorizeExpenseInputSchema,
@@ -60,7 +64,10 @@ export async function categorizeExpense(
       prompt: `Vendor: ${vendor}\nDescription: ${description}`,
       temperature: 0,
       maxRetries: 0,
-      abortSignal: options?.abortSignal,
+      abortSignal: abortAfter(
+        AGENT_TIMEOUT.tools.categorizeExpenseMs,
+        options?.abortSignal,
+      ),
       telemetry: {
         functionId: "categorize-expense",
       },
@@ -75,12 +82,14 @@ export async function categorizeExpense(
     };
   } catch (error) {
     console.error("Expense categorization failed", error);
+    logFailureToLangfuse({
+      source: "provider",
+      error,
+      extra: { tool: "categorizeExpense" },
+    });
     return {
       ok: false,
-      error:
-        error instanceof Error && error.message
-          ? error.message
-          : "Could not categorize expense.",
+      error: toPublicErrorMessage(error, "Could not categorize expense."),
     };
   }
 }

@@ -13,6 +13,9 @@ vi.mock("ai", () => ({
 vi.mock("@/lib/ai/models", () => ({
   getModel: vi.fn(() => "fast-model"),
 }));
+vi.mock("@/lib/observability/log-failure", () => ({
+  logFailureToLangfuse: vi.fn(),
+}));
 
 import { getModel } from "@/lib/ai/models";
 import { categorizeExpense, descriptionFromLineItems } from "./categorize";
@@ -78,7 +81,7 @@ describe("categorizeExpense", () => {
 
     expect(result).toEqual({
       ok: false,
-      error: "provider down",
+      error: "The AI provider is unavailable. Please try again.",
     });
     errorSpy.mockRestore();
   });

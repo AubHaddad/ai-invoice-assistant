@@ -107,6 +107,12 @@ describe("tool UI fallbacks", () => {
         error: "This document is unreadable.",
       }),
     ).toBe("This document is unreadable.");
+    expect(queryInvoicesFallback({ error: "Database is down." })).toBe(
+      "Database is down.",
+    );
+    expect(generateReportFallback({ error: "Database is down." })).toBe(
+      "Database is down.",
+    );
   });
 
   it("labels in-progress tools", () => {

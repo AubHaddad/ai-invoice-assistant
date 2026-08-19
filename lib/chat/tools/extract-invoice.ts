@@ -1,6 +1,7 @@
 import { tool } from "ai";
 import { z } from "zod";
 import "server-only";
+import { executeTool } from "@/lib/chat/safe-tool";
 import { extractInvoiceFromDocument } from "@/lib/invoices/extract";
 
 export const extractInvoiceTool = tool({
@@ -15,10 +16,12 @@ export const extractInvoiceTool = tool({
     userId: z.string(),
   }),
   execute: async ({ documentId }, { context, abortSignal }) => {
-    return extractInvoiceFromDocument({
-      documentId,
-      userId: context.userId,
-      abortSignal,
-    });
+    return executeTool("extractInvoice", () =>
+      extractInvoiceFromDocument({
+        documentId,
+        userId: context.userId,
+        abortSignal,
+      }),
+    );
   },
 });

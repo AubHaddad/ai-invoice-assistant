@@ -11,6 +11,7 @@ import { SpendingTable } from "@/components/chat/spending-table";
 import { ToolStatusChip } from "@/components/chat/tool-status-chip";
 import { Button } from "@/components/ui/button";
 import type { InvoiceAssistantUIMessage } from "@/lib/chat/types";
+import { readToolError } from "@/lib/chat/error-message";
 import {
   BROKEN_PAYLOAD_TEXT,
   extractInvoiceFallback,
@@ -32,6 +33,10 @@ export type ExtractInvoiceToolPart = Extract<
   InvoiceAssistantUIMessage["parts"][number],
   { type: "tool-extractInvoice" }
 >;
+
+function ToolErrorText({ text }: { text: string }) {
+  return <p className="text-sm text-destructive">{text}</p>;
+}
 
 function ToolFallback({ text }: { text: string }) {
   return (
@@ -72,13 +77,16 @@ function ExtractInvoiceResult({
   const parsed = ExtractInvoiceResultSchema.safeParse(part.output);
 
   if (!parsed.success) {
-    return <ToolFallback text={BROKEN_PAYLOAD_TEXT} />;
+    const error = readToolError(part.output);
+    return error ? (
+      <ToolErrorText text={error} />
+    ) : (
+      <ToolFallback text={BROKEN_PAYLOAD_TEXT} />
+    );
   }
 
   if (!parsed.data.ok) {
-    return (
-      <p className="text-sm text-destructive">{parsed.data.error}</p>
-    );
+    return <ToolErrorText text={parsed.data.error} />;
   }
 
   return (
@@ -118,11 +126,7 @@ export function ToolPart({
   }
 
   if (part.state === "output-error") {
-    return (
-      <p className="text-sm text-destructive">
-        {part.errorText || "Tool failed."}
-      </p>
-    );
+    return <ToolErrorText text={part.errorText || "Tool failed."} />;
   }
 
   if (part.state !== "output-available") {
@@ -139,6 +143,12 @@ export function ToolPart({
         />
       );
     case "tool-queryInvoices": {
+      const error = readToolError(part.output);
+
+      if (error) {
+        return <ToolErrorText text={error} />;
+      }
+
       const parsed = QueryInvoicesResultSchema.safeParse(part.output);
 
       if (!parsed.success) {
@@ -155,6 +165,12 @@ export function ToolPart({
       );
     }
     case "tool-generateReport": {
+      const error = readToolError(part.output);
+
+      if (error) {
+        return <ToolErrorText text={error} />;
+      }
+
       const parsed = GenerateReportResultSchema.safeParse(part.output);
 
       if (!parsed.success) {

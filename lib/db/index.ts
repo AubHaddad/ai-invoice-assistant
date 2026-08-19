@@ -1,6 +1,7 @@
 import "server-only";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
+import { EXTERNAL_TIMEOUT } from "@/lib/timeout";
 import { relations } from "./relations";
 
 const globalForDb = globalThis as unknown as {
@@ -20,6 +21,8 @@ function getDatabaseUrl() {
 function createPool() {
   return new Pool({
     connectionString: getDatabaseUrl(),
+    connectionTimeoutMillis: EXTERNAL_TIMEOUT.dbConnectionMs,
+    query_timeout: EXTERNAL_TIMEOUT.dbQueryMs,
   });
 }
 

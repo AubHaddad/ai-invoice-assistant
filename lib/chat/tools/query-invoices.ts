@@ -1,6 +1,7 @@
 import { tool } from "ai";
 import { z } from "zod";
 import "server-only";
+import { executeTool } from "@/lib/chat/safe-tool";
 import {
   queryInvoices,
   QueryInvoicesInputSchema,
@@ -14,9 +15,11 @@ export const queryInvoicesTool = tool({
     userId: z.string(),
   }),
   execute: async (filters, { context }) => {
-    return queryInvoices({
-      userId: context.userId,
-      filters,
-    });
+    return executeTool("queryInvoices", () =>
+      queryInvoices({
+        userId: context.userId,
+        filters,
+      }),
+    );
   },
 });

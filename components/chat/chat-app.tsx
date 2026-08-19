@@ -5,6 +5,7 @@ import { useMemo, useState } from "react";
 import { UserMenu } from "@/components/auth/user-menu";
 import { ChatPanel } from "@/components/chat/chat-panel";
 import { ChatSidebar } from "@/components/chat/chat-sidebar";
+import { ErrorBoundary } from "@/components/error-boundary";
 import type { InvoiceAssistantUIMessage } from "@/lib/chat/types";
 import type { ConversationSummary } from "@/lib/chat/types";
 
@@ -70,13 +71,15 @@ export function ChatApp({
           <UserMenu user={user} />
         </header>
 
-        <ChatPanel
-          conversationId={conversationId}
-          initialMessages={initialMessages}
-          onConversationUpdated={() => {
-            void refreshConversations();
-          }}
-        />
+        <ErrorBoundary>
+          <ChatPanel
+            conversationId={conversationId}
+            initialMessages={initialMessages}
+            onConversationUpdated={() => {
+              void refreshConversations();
+            }}
+          />
+        </ErrorBoundary>
       </div>
     </div>
   );

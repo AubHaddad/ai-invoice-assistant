@@ -7,6 +7,9 @@ import {
   listConversationMessages,
   listConversations,
 } from "@/lib/chat/store";
+import type { InvoiceAssistantUIMessage } from "@/lib/chat/types";
+import type { ConversationSummary } from "@/lib/chat/types";
+import { logFailureToLangfuse } from "@/lib/observability/log-failure";
 
 export default async function ConversationPage({
   params,
@@ -23,13 +26,26 @@ export default async function ConversationPage({
     redirect("/");
   }
 
-  const [conversations, conversation] = await Promise.all([
-    listConversations(session.user.id),
-    getConversationForUser(conversationId, session.user.id),
-  ]);
-  const initialMessages = conversation
-    ? await listConversationMessages(conversationId)
-    : [];
+  let conversations: ConversationSummary[] = [];
+  let conversation;
+  let initialMessages: InvoiceAssistantUIMessage[] = [];
+
+  try {
+    [conversations, conversation] = await Promise.all([
+      listConversations(session.user.id),
+      getConversationForUser(conversationId, session.user.id),
+    ]);
+    initialMessages = conversation
+      ? await listConversationMessages(conversationId)
+      : [];
+  } catch (error) {
+    logFailureToLangfuse({
+      source: "db",
+      error,
+      extra: { route: "conversation" },
+    });
+    throw error;
+  }
 
   return (
     <ChatApp

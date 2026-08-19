@@ -89,7 +89,7 @@ export async function generateReport({
   userId: string;
   filters: GenerateReportInput;
   now?: Date;
-}): Promise<GenerateReportResult> {
+}): Promise<GenerateReportResult | { error: string }> {
   const input = GenerateReportInputSchema.parse(filters);
   const today = todayIsoDate(now);
   const { dateFrom, dateTo } = periodRange(input.period, today);
@@ -108,7 +108,7 @@ export async function generateReport({
   });
 
   if (!built.ok) {
-    throw new Error(built.error);
+    return { error: built.error };
   }
 
   return built.report;

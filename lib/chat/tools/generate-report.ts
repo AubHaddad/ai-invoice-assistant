@@ -1,6 +1,7 @@
 import { tool } from "ai";
 import { z } from "zod";
 import "server-only";
+import { executeTool } from "@/lib/chat/safe-tool";
 import {
   generateReport,
   GenerateReportInputSchema,
@@ -14,9 +15,11 @@ export const generateReportTool = tool({
     userId: z.string(),
   }),
   execute: async (filters, { context }) => {
-    return generateReport({
-      userId: context.userId,
-      filters,
-    });
+    return executeTool("generateReport", () =>
+      generateReport({
+        userId: context.userId,
+        filters,
+      }),
+    );
   },
 });

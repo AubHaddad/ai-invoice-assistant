@@ -1,6 +1,7 @@
 import { generateText } from "ai";
 import "server-only";
 import { getModel } from "@/lib/ai/models";
+import { logFailureToLangfuse } from "@/lib/observability/log-failure";
 
 export function fallbackTitle(userText: string) {
   const compact = userText.trim().replace(/\s+/g, " ");
@@ -19,6 +20,7 @@ export async function generateConversationTitle(userText: string) {
     const { text } = await generateText({
       model: getModel("fast"),
       maxRetries: 0,
+      timeout: 8_000,
       maxOutputTokens: 24,
       temperature: 0.2,
       instructions:
@@ -44,6 +46,11 @@ export async function generateConversationTitle(userText: string) {
     return title || fallback;
   } catch (error) {
     console.error("Failed to generate conversation title", error);
+    logFailureToLangfuse({
+      source: "provider",
+      error,
+      extra: { feature: "title" },
+    });
     return fallback;
   }
 }

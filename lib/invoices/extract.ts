@@ -1,10 +1,14 @@
 import { generateObject, type ModelMessage } from "ai";
 import "server-only";
 import { getModel } from "@/lib/ai/models";
+import { toPublicErrorMessage } from "@/lib/chat/error-message";
+import { AGENT_TIMEOUT } from "@/lib/chat/loop";
 import {
   getDocumentForUser,
   setDocumentPages,
 } from "@/lib/documents/store";
+import { logFailureToLangfuse } from "@/lib/observability/log-failure";
+import { abortAfter } from "@/lib/timeout";
 import {
   InvoiceExtractionSchema,
   InvoiceSchema,
@@ -134,7 +138,7 @@ async function generateInvoice({
     instructions: EXTRACTION_INSTRUCTIONS,
     messages,
     maxRetries: 0,
-    abortSignal,
+    abortSignal: abortAfter(AGENT_TIMEOUT.tools.extractInvoiceMs, abortSignal),
     telemetry: {
       functionId: `extract-invoice-${extractionPath}`,
     },
@@ -442,6 +446,11 @@ export async function extractInvoiceFromDocument({
     };
   } catch (error) {
     console.error("Invoice extraction failed", error);
+    logFailureToLangfuse({
+      source: "tool",
+      error,
+      extra: { tool: "extractInvoice" },
+    });
 
     const message = error instanceof Error ? error.message : "";
 
@@ -451,7 +460,7 @@ export async function extractInvoiceFromDocument({
 
     return {
       ok: false,
-      error: message || "Could not extract invoice fields.",
+      error: toPublicErrorMessage(error, "Could not extract invoice fields."),
     };
   }
 }

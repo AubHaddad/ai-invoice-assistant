@@ -11,6 +11,10 @@ import { propagateAttributes } from "@langfuse/tracing";
 import { after } from "next/server";
 import { getModel } from "@/lib/ai/models";
 import { getCurrentUserId } from "@/lib/auth/session";
+import {
+  DEFAULT_CHAT_ERROR_MESSAGE,
+  toPublicErrorMessage,
+} from "@/lib/chat/error-message";
 import { logAgentStepToLangfuse } from "@/lib/chat/log-step";
 import {
   AGENT_TIMEOUT,
@@ -33,6 +37,7 @@ import {
   listUploadedDocumentsForConversation,
 } from "@/lib/documents/store";
 import { langfuseSpanProcessor } from "@/lib/observability/langfuse";
+import { logFailureToLangfuse } from "@/lib/observability/log-failure";
 import {
   ChatLimitError,
   chatLimitResponse,
@@ -55,6 +60,20 @@ function tokenCountsFromUsage(usage: LanguageModelUsage | undefined) {
     tokensIn: toTokenCount(usage?.inputTokens),
     tokensOut: toTokenCount(usage?.outputTokens),
   };
+}
+
+function failureResponse(error: unknown, extra?: Record<string, unknown>) {
+  logFailureToLangfuse({
+    source: "route",
+    error,
+    extra,
+  });
+  console.error("Chat request failed", error);
+
+  return Response.json(
+    { error: toPublicErrorMessage(error, DEFAULT_CHAT_ERROR_MESSAGE) },
+    { status: 503 },
+  );
 }
 
 function readDocumentIds(value: unknown) {
@@ -86,7 +105,7 @@ export async function POST(req: Request) {
       return chatLimitResponse(error);
     }
 
-    throw error;
+    return failureResponse(error, { stage: "rate-limit" });
   }
 
   const body = (await req.json()) as {
@@ -126,147 +145,169 @@ export async function POST(req: Request) {
       return Response.json({ error: "Conversation not found" }, { status: 404 });
     }
 
-    throw error;
+    return failureResponse(error, { stage: "ensure-conversation" });
   }
 
-  await attachDocumentsToConversation({
-    documentIds,
-    conversationId,
-    userId,
-  });
-
-  const uploadedDocuments = await listUploadedDocumentsForConversation(
-    conversationId,
-    userId,
-  );
-  const systemNotes = messages
-    .filter((message) => message.role === "system")
-    .map((message) => getMessageText(message))
-    .filter(Boolean);
-  const conversationMessages = messages.filter(
-    (message) => message.role !== "system",
-  );
-  const instructions = instructionsWithContext(
-    instructionsWithDocuments(uploadedDocuments),
-    systemNotes,
-  );
-
-  await saveUserMessage({
-    conversationId,
-    message: lastUserMessage,
-  });
-
-  const lastMessage = messages[messages.length - 1];
-
-  if (lastMessage?.role === "system" && isUuid(lastMessage.id)) {
-    await saveSystemMessage({
+  try {
+    await attachDocumentsToConversation({
+      documentIds,
       conversationId,
-      message: lastMessage,
-    });
-  }
-
-  const truncatedMessages = truncateMessages({
-    messages: conversationMessages,
-    systemPrompt: instructions,
-  });
-  const modelMessages = [
-    ...(await convertToModelMessages(truncatedMessages)),
-    ...(lastMessage?.role === "system"
-      ? [
-          {
-            role: "user" as const,
-            content: "Please confirm the invoice was saved.",
-          },
-        ]
-      : []),
-  ];
-
-  return propagateAttributes(
-    {
-      traceName: "generate-chat-response",
       userId,
-      sessionId: conversationId,
-      tags: ["chat"],
-      metadata: {
-        conversationId,
-      },
-    },
-    async () => {
-      let usage: LanguageModelUsage | undefined;
+    });
 
-      const result = streamText({
-        model: getModel("fast"),
-        maxRetries: 0,
-        instructions,
-        messages: modelMessages,
-        tools: invoiceAssistantTools,
-        toolsContext: {
-          extractInvoice: { userId },
-          queryInvoices: { userId },
-          generateReport: { userId },
-        },
-        timeout: AGENT_TIMEOUT,
-        stopWhen: isStepCount(MAX_AGENT_STEPS),
-        prepareStep: ({ stepNumber }) => prepareAgentStep({ stepNumber }),
-        runtimeContext: {
-          userId,
+    const uploadedDocuments = await listUploadedDocumentsForConversation(
+      conversationId,
+      userId,
+    );
+    const systemNotes = messages
+      .filter((message) => message.role === "system")
+      .map((message) => getMessageText(message))
+      .filter(Boolean);
+    const conversationMessages = messages.filter(
+      (message) => message.role !== "system",
+    );
+    const instructions = instructionsWithContext(
+      instructionsWithDocuments(uploadedDocuments),
+      systemNotes,
+    );
+
+    await saveUserMessage({
+      conversationId,
+      message: lastUserMessage,
+    });
+
+    const lastMessage = messages[messages.length - 1];
+
+    if (lastMessage?.role === "system" && isUuid(lastMessage.id)) {
+      await saveSystemMessage({
+        conversationId,
+        message: lastMessage,
+      });
+    }
+
+    const truncatedMessages = truncateMessages({
+      messages: conversationMessages,
+      systemPrompt: instructions,
+    });
+    const modelMessages = [
+      ...(await convertToModelMessages(truncatedMessages)),
+      ...(lastMessage?.role === "system"
+        ? [
+            {
+              role: "user" as const,
+              content: "Please confirm the invoice was saved.",
+            },
+          ]
+        : []),
+    ];
+
+    return propagateAttributes(
+      {
+        traceName: "generate-chat-response",
+        userId,
+        sessionId: conversationId,
+        tags: ["chat"],
+        metadata: {
           conversationId,
         },
-        telemetry: {
-          functionId: "generate-chat-response",
-          includeRuntimeContext: {
-            userId: true,
-            conversationId: true,
+      },
+      async () => {
+        let usage: LanguageModelUsage | undefined;
+
+        const result = streamText({
+          model: getModel("fast"),
+          maxRetries: 0,
+          instructions,
+          messages: modelMessages,
+          tools: invoiceAssistantTools,
+          toolsContext: {
+            extractInvoice: { userId },
+            queryInvoices: { userId },
+            generateReport: { userId },
           },
-        },
-        onStepEnd: (event) => {
-          logAgentStepToLangfuse(event);
-        },
-        onEnd: (event) => {
-          usage = event.usage;
-        },
-      });
+          timeout: AGENT_TIMEOUT,
+          stopWhen: isStepCount(MAX_AGENT_STEPS),
+          prepareStep: ({ stepNumber }) => prepareAgentStep({ stepNumber }),
+          runtimeContext: {
+            userId,
+            conversationId,
+          },
+          telemetry: {
+            functionId: "generate-chat-response",
+            includeRuntimeContext: {
+              userId: true,
+              conversationId: true,
+            },
+          },
+          onStepEnd: (event) => {
+            logAgentStepToLangfuse(event);
+          },
+          onError: ({ error }) => {
+            logFailureToLangfuse({
+              source: "stream",
+              error,
+              extra: { conversationId },
+            });
+          },
+          onEnd: (event) => {
+            usage = event.usage;
+          },
+        });
 
-      result.consumeStream();
+        result.consumeStream();
 
-      after(async () => {
-        await langfuseSpanProcessor.forceFlush();
-      });
+        after(async () => {
+          await langfuseSpanProcessor.forceFlush();
+        });
 
-      return createUIMessageStreamResponse({
-        stream: toUIMessageStream({
-          stream: result.stream,
-          originalMessages: messages,
-          generateMessageId: () => crypto.randomUUID(),
-          onFinish: async ({ responseMessage, isContinuation }) => {
-            const resolvedUsage =
-              usage ??
-              (await Promise.resolve(result.usage).catch(() => undefined));
-            const tokenCounts = tokenCountsFromUsage(resolvedUsage);
-            const tokensUsed =
-              (tokenCounts.tokensIn ?? 0) + (tokenCounts.tokensOut ?? 0);
+        return createUIMessageStreamResponse({
+          stream: toUIMessageStream({
+            stream: result.stream,
+            originalMessages: messages,
+            generateMessageId: () => crypto.randomUUID(),
+            onError: (error) => toPublicErrorMessage(error),
+            onFinish: async ({ responseMessage, isContinuation }) => {
+              const resolvedUsage =
+                usage ??
+                (await Promise.resolve(result.usage).catch(() => undefined));
+              const tokenCounts = tokenCountsFromUsage(resolvedUsage);
+              const tokensUsed =
+                (tokenCounts.tokensIn ?? 0) + (tokenCounts.tokensOut ?? 0);
 
-            try {
-              await saveAssistantMessage({
-                conversationId,
-                message: responseMessage,
-                ...tokenCounts,
-                isContinuation,
-              });
-            } catch (error) {
-              console.error("Failed to persist assistant message", error);
-            }
-
-            if (tokensUsed > 0) {
               try {
-                await recordChatTokenUsage(userId, tokensUsed);
+                await saveAssistantMessage({
+                  conversationId,
+                  message: responseMessage,
+                  ...tokenCounts,
+                  isContinuation,
+                });
               } catch (error) {
-                console.error("Failed to record chat token usage", error);
+                console.error("Failed to persist assistant message", error);
+                logFailureToLangfuse({
+                  source: "db",
+                  error,
+                  extra: { stage: "save-assistant-message" },
+                });
               }
-            }
-          },
-        }),
-      });
-    },
-  );
+
+              if (tokensUsed > 0) {
+                try {
+                  await recordChatTokenUsage(userId, tokensUsed);
+                } catch (error) {
+                  console.error("Failed to record chat token usage", error);
+                  logFailureToLangfuse({
+                    source: "db",
+                    error,
+                    extra: { stage: "record-token-usage" },
+                  });
+                }
+              }
+            },
+          }),
+        });
+      },
+    );
+  } catch (error) {
+    return failureResponse(error, { stage: "chat" });
+  }
 }

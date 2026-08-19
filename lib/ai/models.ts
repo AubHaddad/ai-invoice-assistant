@@ -1,16 +1,14 @@
 import { anthropic } from "@ai-sdk/anthropic";
 import { openai } from "@ai-sdk/openai";
-import {
-  APICallError,
-  LoadAPIKeyError,
-  RetryError,
-  wrapLanguageModel,
-  type LanguageModel,
-} from "ai";
+import { wrapLanguageModel, type LanguageModel } from "ai";
 import "server-only";
+import { withFallback } from "@/lib/ai/retry";
+import { logFailureToLangfuse } from "@/lib/observability/log-failure";
 
 export type ModelTier = "cheap" | "fast" | "smart";
 export type ModelProvider = "anthropic" | "openai";
+
+export { withFallback } from "@/lib/ai/retry";
 
 const PROVIDERS = ["anthropic", "openai"] as const;
 
@@ -78,90 +76,12 @@ function createProviderModel(provider: ModelProvider, modelId: string) {
   }
 }
 
-function isTimeoutError(error: unknown) {
-  const seen = new Set<unknown>();
-  let current: unknown = unwrapRetryError(error);
-
-  while (current && typeof current === "object" && !seen.has(current)) {
-    seen.add(current);
-
-    const name = "name" in current ? String(current.name) : "";
-    const message = "message" in current ? String(current.message) : "";
-
-    if (name === "TimeoutError") {
-      return true;
-    }
-
-    if (name === "AbortError" && /timeout/i.test(message)) {
-      return true;
-    }
-
-    current = "cause" in current ? current.cause : undefined;
-  }
-
-  return false;
-}
-
-function unwrapRetryError(error: unknown) {
-  return RetryError.isInstance(error) ? error.lastError : error;
-}
-
-function getErrorStatusCode(error: unknown) {
-  const cause = unwrapRetryError(error);
-  return APICallError.isInstance(cause) ? cause.statusCode : undefined;
-}
-
-function isTransientProviderError(error: unknown) {
-  if (isTimeoutError(error)) {
-    return true;
-  }
-
-  const status = getErrorStatusCode(error);
-  return status === 429 || (status != null && status >= 500);
-}
-
-function isProviderUnavailableError(error: unknown) {
-  const cause = unwrapRetryError(error);
-
-  if (LoadAPIKeyError.isInstance(cause)) {
-    return true;
-  }
-
-  const status = getErrorStatusCode(error);
-  return status === 401 || status === 403 || isTransientProviderError(error);
-}
-
-/**
- * Retry once on 429/5xx/timeout, then switch provider.
- * Auth/missing-key failures skip the retry and switch immediately.
- */
-export async function withFallback<T>(
-  runPrimary: () => PromiseLike<T>,
-  runFallback: () => PromiseLike<T>,
-): Promise<T> {
-  try {
-    return await runPrimary();
-  } catch (error) {
-    if (isTransientProviderError(error)) {
-      try {
-        return await runPrimary();
-      } catch (retryError) {
-        if (!isProviderUnavailableError(retryError)) {
-          throw retryError;
-        }
-
-        console.warn("Primary AI provider failed after retry; switching provider", retryError);
-        return runFallback();
-      }
-    }
-
-    if (isProviderUnavailableError(error)) {
-      console.warn("Primary AI provider unavailable; switching provider", error);
-      return runFallback();
-    }
-
-    throw error;
-  }
+function logProviderFailure(error: unknown, stage: "retry" | "fallback") {
+  logFailureToLangfuse({
+    source: "provider",
+    error,
+    extra: { stage },
+  });
 }
 
 /**
@@ -185,11 +105,13 @@ export function getModel(tier: ModelTier): LanguageModel {
         withFallback(
           () => doGenerate(),
           () => fallback.doGenerate(params),
+          { onFailure: logProviderFailure },
         ),
       wrapStream: ({ doStream, params }) =>
         withFallback(
           () => doStream(),
           () => fallback.doStream(params),
+          { onFailure: logProviderFailure },
         ),
     },
   });

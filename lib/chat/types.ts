@@ -25,18 +25,20 @@ export type ConversationSummary = {
   updatedAt: string;
 };
 
+export type ToolErrorResult = { error: string };
+
 export type InvoiceAssistantTools = {
   extractInvoice: {
     input: { documentId: string };
-    output: ExtractInvoiceResult;
+    output: ExtractInvoiceResult | ToolErrorResult;
   };
   queryInvoices: {
     input: QueryInvoicesInput;
-    output: QueryInvoicesResult;
+    output: QueryInvoicesResult | ToolErrorResult;
   };
   generateReport: {
     input: GenerateReportInput;
-    output: GenerateReportResult;
+    output: GenerateReportResult | ToolErrorResult;
   };
   calculate: {
     input: CalculateInput;

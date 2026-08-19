@@ -6,6 +6,7 @@ import {
   type GenerateReportResult,
   type QueryInvoicesResult,
 } from "@/lib/invoices/types";
+import { readToolError } from "@/lib/chat/error-message";
 import {
   invoiceCount,
   REPORT_GROUP_LABELS,
@@ -29,6 +30,12 @@ export function toolStatusFallback(toolName: string) {
 }
 
 export function extractInvoiceFallback(output: unknown) {
+  const error = readToolError(output);
+
+  if (error) {
+    return error;
+  }
+
   const parsed = ExtractInvoiceResultSchema.safeParse(output);
 
   if (!parsed.success) {
@@ -48,6 +55,12 @@ export function formatExtractInvoice(result: ExtractInvoiceResult) {
 }
 
 export function queryInvoicesFallback(output: unknown) {
+  const error = readToolError(output);
+
+  if (error) {
+    return error;
+  }
+
   const parsed = QueryInvoicesResultSchema.safeParse(output);
 
   if (!parsed.success) {
@@ -75,6 +88,12 @@ export function formatQueryInvoices(result: QueryInvoicesResult) {
 }
 
 export function generateReportFallback(output: unknown) {
+  const error = readToolError(output);
+
+  if (error) {
+    return error;
+  }
+
   const parsed = GenerateReportResultSchema.safeParse(output);
 
   if (!parsed.success) {

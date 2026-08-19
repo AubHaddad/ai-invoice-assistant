@@ -1,5 +1,6 @@
 import { Storage } from "@google-cloud/storage";
 import "server-only";
+import { EXTERNAL_TIMEOUT, withTimeout } from "@/lib/timeout";
 
 const SIGNED_URL_TTL_MS = 15 * 60 * 1000;
 
@@ -70,6 +71,10 @@ export async function objectExists(storageKey: string) {
 }
 
 export async function downloadObject(storageKey: string) {
-  const [contents] = await getFile(storageKey).download();
+  const [contents] = await withTimeout(
+    getFile(storageKey).download(),
+    EXTERNAL_TIMEOUT.gcsMs,
+    "Invoice file download timed out.",
+  );
   return contents;
 }
