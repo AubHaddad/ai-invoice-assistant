@@ -1,7 +1,7 @@
 import "dotenv/config";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { eq } from "drizzle-orm";
-import { InvoiceSchema } from "@/lib/schemas";
+import { InvoiceSchema, type Invoice } from "@/lib/schemas";
 import { invoiceInsertValues, lineItemInsertValues } from "./invoices";
 import {
   conversationInvoices,
@@ -23,6 +23,136 @@ const db = drizzle(databaseUrl);
 
 const DEMO_EMAIL = "ada@invoice-assistant.dev";
 
+const SEEDED_INVOICES: Array<Invoice & { fileName: string; gcsPath: string }> = [
+  {
+    fileName: "github-inv-2041.pdf",
+    gcsPath: "seed/github-inv-2041.pdf",
+    vendor: "GitHub",
+    invoiceNumber: "INV-2041",
+    issueDate: "2026-04-12",
+    dueDate: "2026-05-12",
+    currency: "USD",
+    subtotal: 200,
+    tax: 20,
+    total: 220,
+    category: "software",
+    confidence: 0.95,
+    raw: { vendorName: "GitHub", invoiceNumber: "INV-2041" },
+    lineItems: [
+      {
+        description: "Team plan — April",
+        quantity: 1,
+        unitPrice: 200,
+        amount: 200,
+      },
+    ],
+  },
+  {
+    fileName: "figma-inv-2042.pdf",
+    gcsPath: "seed/figma-inv-2042.pdf",
+    vendor: "Figma",
+    invoiceNumber: "INV-2042",
+    issueDate: "2026-05-18",
+    dueDate: "2026-06-17",
+    currency: "EUR",
+    subtotal: 150,
+    tax: 30,
+    total: 180,
+    category: "software",
+    confidence: 0.94,
+    raw: { vendorName: "Figma", invoiceNumber: "INV-2042" },
+    lineItems: [
+      {
+        description: "Organization seat — May",
+        quantity: 1,
+        unitPrice: 150,
+        amount: 150,
+      },
+    ],
+  },
+  {
+    fileName: "jetbrains-inv-2043.pdf",
+    gcsPath: "seed/jetbrains-inv-2043.pdf",
+    vendor: "JetBrains",
+    invoiceNumber: "INV-2043",
+    issueDate: "2026-06-09",
+    dueDate: "2026-07-09",
+    currency: "MAD",
+    subtotal: 1820,
+    tax: 364,
+    total: 2184,
+    category: "software",
+    confidence: 0.93,
+    raw: { vendorName: "JetBrains", invoiceNumber: "INV-2043" },
+    lineItems: [
+      {
+        description: "All Products Pack — June",
+        quantity: 1,
+        unitPrice: 1820,
+        amount: 1820,
+      },
+    ],
+  },
+  {
+    fileName: "acme-inv-1042.pdf",
+    gcsPath: "seed/acme-inv-1042.pdf",
+    vendor: "Acme Corp",
+    invoiceNumber: "INV-1042",
+    issueDate: "2026-08-01",
+    dueDate: "2026-08-31",
+    currency: "USD",
+    subtotal: 1200,
+    tax: 120,
+    total: 1320,
+    category: "software",
+    confidence: 0.96,
+    raw: { vendorName: "Acme Corp", invoiceNumber: "INV-1042" },
+    lineItems: [
+      {
+        description: "API usage — August",
+        quantity: 1,
+        unitPrice: 1200,
+        amount: 1200,
+      },
+    ],
+  },
+];
+
+async function insertInvoice(
+  userId: string,
+  seed: Invoice & { fileName: string; gcsPath: string },
+) {
+  const { fileName, gcsPath, ...invoiceFields } = seed;
+  const parsed = InvoiceSchema.parse(invoiceFields);
+
+  const [document] = await db
+    .insert(documents)
+    .values({
+      userId,
+      fileName,
+      mime: "application/pdf",
+      sizeBytes: 24_576,
+      gcsPath,
+      status: "uploaded",
+      pages: 1,
+    })
+    .returning();
+
+  const [invoice] = await db
+    .insert(invoices)
+    .values(
+      invoiceInsertValues(parsed, {
+        userId,
+        documentId: document.id,
+      }),
+    )
+    .returning();
+
+  await db.insert(lineItems).values(lineItemInsertValues(parsed, invoice.id));
+
+  return { document, invoice };
+}
+
 async function seed() {
   await db.delete(users).where(eq(users.email, DEMO_EMAIL));
 
@@ -35,57 +165,19 @@ async function seed() {
     })
     .returning();
 
-  const [document] = await db
-    .insert(documents)
-    .values({
-      userId: user.id,
-      fileName: "acme-inv-1042.pdf",
-      mime: "application/pdf",
-      sizeBytes: 24_576,
-      gcsPath: "seed/acme-inv-1042.pdf",
-      status: "uploaded",
-      pages: 1,
-    })
-    .returning();
+  const seeded = [];
 
-  const parsed = InvoiceSchema.parse({
-    vendor: "Acme Corp",
-    invoiceNumber: "INV-1042",
-    issueDate: "2026-08-01",
-    dueDate: "2026-08-31",
-    currency: "USD",
-    subtotal: 1200,
-    tax: 120,
-    total: 1320,
-    category: "software",
-    confidence: 0.96,
-    raw: {
-      vendorName: "Acme Corp",
-      invoiceNumber: "INV-1042",
-    },
-    lineItems: [
-      {
-        description: "API usage — August",
-        quantity: 1,
-        unitPrice: 1200,
-        amount: 1200,
-      },
-    ],
-  });
+  for (const invoiceSeed of SEEDED_INVOICES) {
+    seeded.push(await insertInvoice(user.id, invoiceSeed));
+  }
 
-  const [invoice] = await db
-    .insert(invoices)
-    .values(
-      invoiceInsertValues(parsed, {
-        userId: user.id,
-        documentId: document.id,
-      }),
-    )
-    .returning();
+  const acme = seeded.find(
+    (row) => row.invoice.invoiceNumber === "INV-1042",
+  );
 
-  await db
-    .insert(lineItems)
-    .values(lineItemInsertValues(parsed, invoice.id));
+  if (!acme) {
+    throw new Error("Expected Acme invoice in seed data");
+  }
 
   const [conversation] = await db
     .insert(conversations)
@@ -97,7 +189,7 @@ async function seed() {
 
   await db.insert(conversationInvoices).values({
     conversationId: conversation.id,
-    invoiceId: invoice.id,
+    invoiceId: acme.invoice.id,
   });
 
   await db.insert(messages).values([
@@ -151,8 +243,11 @@ async function seed() {
 
   console.log("Seeded demo data:");
   console.log(`  user:          ${user.email}`);
-  console.log(`  document:      ${document.fileName} (${document.gcsPath})`);
-  console.log(`  invoice:       ${invoice.invoiceNumber} (${invoice.vendor})`);
+  for (const row of seeded) {
+    console.log(
+      `  invoice:       ${row.invoice.invoiceNumber} ${row.invoice.vendor} ${row.invoice.total} ${row.invoice.currency} (${row.invoice.issueDate})`,
+    );
+  }
   console.log(`  conversation:  ${conversation.title}`);
 }
 

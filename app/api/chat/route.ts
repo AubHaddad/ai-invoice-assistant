@@ -11,6 +11,12 @@ import { propagateAttributes } from "@langfuse/tracing";
 import { after } from "next/server";
 import { getModel } from "@/lib/ai/models";
 import { getCurrentUserId } from "@/lib/auth/session";
+import { logAgentStepToLangfuse } from "@/lib/chat/log-step";
+import {
+  AGENT_TIMEOUT,
+  MAX_AGENT_STEPS,
+  prepareAgentStep,
+} from "@/lib/chat/loop";
 import {
   ensureConversation,
   isUuid,
@@ -181,7 +187,9 @@ export async function POST(req: Request) {
           extractInvoice: { userId },
           queryInvoices: { userId },
         },
-        stopWhen: isStepCount(5),
+        timeout: AGENT_TIMEOUT,
+        stopWhen: isStepCount(MAX_AGENT_STEPS),
+        prepareStep: ({ stepNumber }) => prepareAgentStep({ stepNumber }),
         runtimeContext: {
           userId,
           conversationId,
@@ -192,6 +200,9 @@ export async function POST(req: Request) {
             userId: true,
             conversationId: true,
           },
+        },
+        onStepEnd: (event) => {
+          logAgentStepToLangfuse(event);
         },
         onEnd: (event) => {
           usage = event.usage;
