@@ -25,6 +25,8 @@
 /.next-e2e/
 /.next-eval/
 /.next-eval-weak/
+/.next-demo/
+/docs/.demo-video/
 /out/
 
 # production
