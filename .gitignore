@@ -57,3 +57,18 @@ gcs-cors.json
 
 # generated Cloud SQL password (never commit)
 .cloudsql-postgres-password
+
+# terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+crash.log
+crash.*.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+backend.hcl
+terraform.tfvars
+tfplan
+tfplan.*

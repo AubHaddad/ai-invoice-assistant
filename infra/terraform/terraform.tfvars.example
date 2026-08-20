@@ -1,0 +1,10 @@
+project_id = "invoice-assistant-506013"
+region     = "europe-southwest1"
+
+# After the first image is in Artifact Registry:
+# image = "europe-southwest1-docker.pkg.dev/invoice-assistant-506013/app/ai-invoice-assistant:latest"
+
+# Public (non-secret) runtime config:
+# auth_google_id           = "....apps.googleusercontent.com"
+# langfuse_public_key      = "pk-lf-..."
+# upstash_redis_rest_url   = "https://....upstash.io"
