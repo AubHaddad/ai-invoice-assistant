@@ -19,7 +19,8 @@
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "eval": "node evals/promptfoo/run.mjs",
-    "eval:weak": "node evals/promptfoo/run.mjs --weak"
+    "eval:weak": "node evals/promptfoo/run.mjs --weak",
+    "demo:gif": "tsx scripts/record-demo.mjs"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^4.0.39",
