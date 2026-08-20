@@ -113,8 +113,6 @@ export function ChatPanel({
   onConversationUpdated,
 }: ChatPanelProps) {
   const [input, setInput] = useState("");
-  const uploadedDocumentIdsRef = useRef<string[]>([]);
-  const pendingDocumentIdsRef = useRef<string[]>([]);
   const [transport] = useState(
     () =>
       new DefaultChatTransport({
@@ -124,10 +122,6 @@ export function ChatPanel({
             ...body,
             id,
             messages,
-            documentIds:
-              pendingDocumentIdsRef.current.length > 0
-                ? pendingDocumentIdsRef.current
-                : uploadedDocumentIdsRef.current,
           },
         }),
       }),
@@ -139,7 +133,6 @@ export function ChatPanel({
       generateId: createUuid,
       transport,
       onFinish: () => {
-        pendingDocumentIdsRef.current = [];
         onConversationUpdated?.();
       },
     });
@@ -179,7 +172,6 @@ export function ChatPanel({
     clearUploaded,
     accept,
   } = useComposerUploads(conversationId);
-  uploadedDocumentIdsRef.current = uploadedDocumentIds;
   const isBusy = status === "submitted" || status === "streaming";
   const hasUploaded = uploadedDocumentIds.length > 0;
   const canSend =
@@ -215,8 +207,10 @@ export function ChatPanel({
       return;
     }
 
-    pendingDocumentIdsRef.current = [...uploadedDocumentIds];
-    void sendMessage({ text });
+    void sendMessage(
+      { text },
+      { body: { documentIds: [...uploadedDocumentIds] } },
+    );
     setInput("");
     clearUploaded();
   }

@@ -18,5 +18,8 @@ test-results
 evals/promptfoo/output
 evals/promptfoo/.promptfoo
 .promptfoo
+infra/terraform/.terraform
+*.tfstate
+*.tfstate.*
 *.md
 .DS_Store

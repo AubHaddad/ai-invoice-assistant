@@ -6,7 +6,7 @@ resource "google_service_account" "app" {
 
 resource "google_service_account" "github_actions" {
   account_id   = "github-actions"
-  display_name = "GitHub Actions Cloud SQL migrate"
+  display_name = "GitHub Actions CI/CD"
   depends_on   = [google_project_service.enabled]
 }
 
@@ -69,6 +69,25 @@ resource "google_artifact_registry_repository_iam_member" "cloudbuild_writer" {
   repository = google_artifact_registry_repository.app.repository_id
   role       = "roles/artifactregistry.writer"
   member     = "serviceAccount:${data.google_project.current.number}@cloudbuild.gserviceaccount.com"
+}
+
+resource "google_artifact_registry_repository_iam_member" "github_writer" {
+  location   = google_artifact_registry_repository.app.location
+  repository = google_artifact_registry_repository.app.repository_id
+  role       = "roles/artifactregistry.writer"
+  member     = "serviceAccount:${google_service_account.github_actions.email}"
+}
+
+resource "google_project_iam_member" "github_run_admin" {
+  project = var.project_id
+  role    = "roles/run.admin"
+  member  = "serviceAccount:${google_service_account.github_actions.email}"
+}
+
+resource "google_service_account_iam_member" "github_act_as_app" {
+  service_account_id = google_service_account.app.name
+  role               = "roles/iam.serviceAccountUser"
+  member             = "serviceAccount:${google_service_account.github_actions.email}"
 }
 
 resource "google_cloud_run_v2_service_iam_member" "public" {

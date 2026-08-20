@@ -1,0 +1,108 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  PROJECT: invoice-assistant-506013
+  REGION: europe-southwest1
+  SERVICE: ai-invoice-assistant
+
+jobs:
+  eval:
+    name: promptfoo evals
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: ai_invoice_assistant
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d ai_invoice_assistant"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/ai_invoice_assistant
+      AUTH_SECRET: eval-auth-secret-eval-auth-secret-32
+      AUTH_GOOGLE_ID: eval-google-id
+      AUTH_GOOGLE_SECRET: eval-google-secret
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      LANGFUSE_TRACING_ENVIRONMENT: eval
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Require LLM secrets
+        run: |
+          if [[ -z "${ANTHROPIC_API_KEY}" || -z "${OPENAI_API_KEY}" ]]; then
+            echo "Set repository secrets ANTHROPIC_API_KEY and OPENAI_API_KEY." >&2
+            exit 1
+          fi
+      - run: npm run db:migrate
+      - name: Run promptfoo evals
+        run: npm run eval
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: promptfoo-results
+          path: evals/promptfoo/output
+          retention-days: 14
+          if-no-files-found: ignore
+
+  deploy:
+    name: docker build and Cloud Run
+    needs: eval
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      IMAGE: europe-southwest1-docker.pkg.dev/invoice-assistant-506013/app/ai-invoice-assistant
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
+          service_account: ${{ vars.GCP_WIF_SA }}
+
+      - uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker "${REGION}-docker.pkg.dev" --quiet
+
+      - name: Build image
+        run: docker build -t "${IMAGE}:${GITHUB_SHA}" -t "${IMAGE}:latest" .
+
+      - name: Push image
+        run: |
+          docker push "${IMAGE}:${GITHUB_SHA}"
+          docker push "${IMAGE}:latest"
+
+      - name: Deploy to Cloud Run
+        run: |
+          gcloud run deploy "${SERVICE}" \
+            --project="${PROJECT}" \
+            --region="${REGION}" \
+            --image="${IMAGE}:${GITHUB_SHA}" \
+            --quiet
