@@ -1,4 +1,4 @@
-import { signInWithGoogle } from "@/lib/auth/actions";
+import { signInWithE2E, signInWithGoogle } from "@/lib/auth/actions";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -7,6 +7,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { isE2ETestAuth } from "@/lib/e2e/env";
 
 function GoogleIcon() {
   return (
@@ -41,7 +42,14 @@ export default function LoginPage() {
             Sign in to upload invoices and ask questions in chat.
           </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="grid gap-2">
+          {isE2ETestAuth() ? (
+            <form action={signInWithE2E}>
+              <Button type="submit" size="lg" className="w-full">
+                Sign in as test user
+              </Button>
+            </form>
+          ) : null}
           <form action={signInWithGoogle}>
             <Button type="submit" size="lg" className="w-full">
               <GoogleIcon />

@@ -38,10 +38,13 @@ import {
 import { invoiceAssistantTools } from "@/lib/chat/tools";
 import { truncateMessages } from "@/lib/chat/truncate";
 import { getMessageText } from "@/lib/chat/ui-message";
+import type { InvoiceAssistantUIMessage } from "@/lib/chat/types";
 import {
   attachDocumentsToConversation,
   listUploadedDocumentsForConversation,
 } from "@/lib/documents/store";
+import { e2eChatResponse } from "@/lib/e2e/chat";
+import { isE2ETestAuth } from "@/lib/e2e/env";
 import { langfuseSpanProcessor } from "@/lib/observability/langfuse";
 import { logFailureToLangfuse } from "@/lib/observability/log-failure";
 import {
@@ -88,15 +91,17 @@ export async function POST(req: Request) {
     return new Response("Unauthorized", { status: 401 });
   }
 
-  try {
-    const { pending } = await enforceChatLimits(userId);
-    after(() => pending);
-  } catch (error) {
-    if (error instanceof ChatLimitError) {
-      return chatLimitResponse(error);
-    }
+  if (!isE2ETestAuth()) {
+    try {
+      const { pending } = await enforceChatLimits(userId);
+      after(() => pending);
+    } catch (error) {
+      if (error instanceof ChatLimitError) {
+        return chatLimitResponse(error);
+      }
 
-    return failureResponse(error, { stage: "rate-limit" });
+      return failureResponse(error, { stage: "rate-limit" });
+    }
   }
 
   const body = (await req.json()) as {
@@ -175,6 +180,14 @@ export async function POST(req: Request) {
       await saveSystemMessage({
         conversationId,
         message: lastMessage,
+      });
+    }
+
+    if (isE2ETestAuth()) {
+      return e2eChatResponse({
+        userId,
+        conversationId,
+        messages: messages as InvoiceAssistantUIMessage[],
       });
     }
 

@@ -20,8 +20,8 @@ export function InvoiceCard({ result }: { result: ExtractInvoiceSuccess }) {
     ? EXPENSE_CATEGORY_LABELS[invoice.category]
     : null;
 
-  return (
-    <div className="w-full max-w-xl overflow-hidden rounded-3xl border bg-background text-sm">
+    return (
+    <div className="w-full max-w-xl overflow-hidden rounded-3xl border bg-background text-sm" data-testid="invoice-card">
       <div className="border-b px-3 py-2">
         <p className="font-medium">{invoice.vendor}</p>
         <p className="text-muted-foreground">

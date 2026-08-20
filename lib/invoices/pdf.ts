@@ -1,3 +1,4 @@
+import "./pdf-dom-polyfill";
 import { PDFParse } from "pdf-parse";
 import { pdf } from "pdf-to-img";
 import "server-only";

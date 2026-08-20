@@ -6,6 +6,10 @@ export async function signInWithGoogle() {
   await signIn("google", { redirectTo: "/" });
 }
 
+export async function signInWithE2E() {
+  await signIn("e2e", { login: "e2e", redirectTo: "/" });
+}
+
 export async function signOutAction() {
   await signOut({ redirectTo: "/login" });
 }
