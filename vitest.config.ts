@@ -5,6 +5,19 @@ export default defineConfig({
   test: {
     environment: "node",
     include: ["**/*.test.ts"],
+    setupFiles: ["./vitest.setup.ts"],
+    coverage: {
+      provider: "v8",
+      reporter: ["text", "html", "json-summary"],
+      include: ["lib/chat/tools/**/*.ts", "lib/schemas/**/*.ts"],
+      exclude: ["**/*.test.ts"],
+      thresholds: {
+        lines: 80,
+        functions: 80,
+        branches: 80,
+        statements: 80,
+      },
+    },
   },
   resolve: {
     alias: {
