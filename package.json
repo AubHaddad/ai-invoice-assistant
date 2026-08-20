@@ -9,6 +9,7 @@
     "lint": "eslint",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
+    "db:migrate:cloudsql": "bash infra/migrate-cloud-sql.sh",
     "db:push": "drizzle-kit push",
     "db:seed": "tsx lib/db/seed.ts",
     "db:seed:rates": "tsx lib/db/seed-rates.ts",

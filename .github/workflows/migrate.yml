@@ -1,0 +1,45 @@
+name: Migrate Cloud SQL
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - drizzle/**
+      - drizzle.config.ts
+      - infra/migrate-cloud-sql.sh
+      - .github/workflows/migrate.yml
+  workflow_dispatch:
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      PROJECT: invoice-assistant-506013
+      PROXY_PORT: "5432"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
+          service_account: ${{ vars.GCP_WIF_SA }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Install Cloud SQL Auth Proxy
+        run: |
+          curl -fsSL -o cloud-sql-proxy \
+            https://storage.googleapis.com/cloud-sql-connectors/cloud-sql-proxy/v2.25.2/cloud-sql-proxy.linux.amd64
+          chmod +x cloud-sql-proxy
+          sudo mv cloud-sql-proxy /usr/local/bin/cloud-sql-proxy
+
+      - name: Apply Drizzle migrations
+        run: bash infra/migrate-cloud-sql.sh

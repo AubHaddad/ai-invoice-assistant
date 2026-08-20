@@ -10,7 +10,7 @@ export class TimeoutError extends Error {
 
 /** Timeouts for non-LLM I/O (Postgres, GCS). */
 export const EXTERNAL_TIMEOUT = {
-  dbConnectionMs: 5_000,
+  dbConnectionMs: 10_000,
   dbQueryMs: 8_000,
   gcsMs: 15_000,
 } as const;

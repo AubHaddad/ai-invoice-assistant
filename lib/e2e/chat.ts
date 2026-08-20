@@ -39,11 +39,12 @@ export const E2E_FIXTURE_INVOICE: Invoice = {
 
 function writeText(
   writer: {
-    write: (part: {
-      type: "text-start" | "text-delta" | "text-end";
-      id: string;
-      delta?: string;
-    }) => void;
+    write: (
+      part:
+        | { type: "text-start"; id: string }
+        | { type: "text-delta"; id: string; delta: string }
+        | { type: "text-end"; id: string },
+    ) => void;
   },
   text: string,
 ) {

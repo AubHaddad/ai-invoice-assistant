@@ -51,6 +51,9 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# gcs
+# gcs — JSON keys stay local; CORS/lifecycle live in infra/
 gcs-sa.json
 gcs-cors.json
+
+# generated Cloud SQL password (never commit)
+.cloudsql-postgres-password
