@@ -15,7 +15,9 @@
     "db:studio": "drizzle-kit studio",
     "test": "vitest run --coverage",
     "test:watch": "vitest",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "eval": "node evals/promptfoo/run.mjs",
+    "eval:weak": "node evals/promptfoo/run.mjs --weak"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^4.0.39",
@@ -66,6 +68,7 @@
     "drizzle-kit": "^1.0.0-rc.4",
     "eslint": "^9",
     "eslint-config-next": "16.3.1",
+    "promptfoo": "0.120.19",
     "tailwindcss": "^4",
     "tsx": "^4.23.12",
     "typescript": "^5",

@@ -402,16 +402,29 @@ async function insertInvoice(
 }
 
 async function seed() {
-  const [user] = await db
+  const [existing] = await db
     .select()
     .from(users)
     .where(eq(users.email, SEED_EMAIL))
     .limit(1);
 
+  let user = existing;
+
   if (!user) {
-    throw new Error(
-      `No user found for ${SEED_EMAIL}. Sign in once, then re-run the seed.`,
-    );
+    const [created] = await db
+      .insert(users)
+      .values({
+        email: SEED_EMAIL,
+        name: "Seed User",
+      })
+      .returning();
+
+    if (!created) {
+      throw new Error(`Failed to create seed user ${SEED_EMAIL}`);
+    }
+
+    user = created;
+    console.log(`Created seed user ${SEED_EMAIL}`);
   }
 
   await db.delete(documents).where(

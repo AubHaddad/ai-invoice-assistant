@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { SYSTEM_PROMPT, UNTRUSTED_DOCUMENT_POLICY } from "./prompts";
+import {
+  STRONG_SYSTEM_PROMPT,
+  SYSTEM_PROMPT,
+  UNTRUSTED_DOCUMENT_POLICY,
+  WEAK_SYSTEM_PROMPT,
+} from "./prompts";
 
 describe("SYSTEM_PROMPT", () => {
   it("sets a finance-assistant-for-invoices persona", () => {
@@ -41,5 +46,13 @@ describe("SYSTEM_PROMPT", () => {
     expect(SYSTEM_PROMPT).toContain(UNTRUSTED_DOCUMENT_POLICY);
     expect(SYSTEM_PROMPT).toMatch(/untrusted data/i);
     expect(SYSTEM_PROMPT).toMatch(/ignore previous instructions/i);
+  });
+
+  it("keeps a weaker prompt distinct so promptfoo can detect regressions", () => {
+    expect(WEAK_SYSTEM_PROMPT).not.toMatch(/always call calculate/i);
+    expect(WEAK_SYSTEM_PROMPT).not.toMatch(/politely refuse/i);
+    expect(WEAK_SYSTEM_PROMPT).toMatch(/Always reply in English/);
+    expect(STRONG_SYSTEM_PROMPT).not.toBe(WEAK_SYSTEM_PROMPT);
+    expect(SYSTEM_PROMPT).toBe(STRONG_SYSTEM_PROMPT);
   });
 });

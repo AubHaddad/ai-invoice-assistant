@@ -16,10 +16,15 @@
 /test-results
 /blob-report
 /playwright/.cache
+/evals/promptfoo/output/
+/evals/promptfoo/.promptfoo
+.promptfoo
 
 # next.js
 /.next/
 /.next-e2e/
+/.next-eval/
+/.next-eval-weak/
 /out/
 
 # production

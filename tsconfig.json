@@ -36,7 +36,11 @@
     ".next/dev/types/**/*.ts",
     "**/*.mts",
     ".next-e2e/types/**/*.ts",
-    ".next-e2e/dev/types/**/*.ts"
+    ".next-e2e/dev/types/**/*.ts",
+    ".next-eval/types/**/*.ts",
+    ".next-eval/dev/types/**/*.ts",
+    ".next-eval-weak/types/**/*.ts",
+    ".next-eval-weak/dev/types/**/*.ts"
   ],
   "exclude": [
     "node_modules"

@@ -16,7 +16,10 @@ export function fallbackTitle(userText: string) {
 export async function generateConversationTitle(userText: string) {
   const fallback = fallbackTitle(userText);
 
-  if (process.env["E2E_TEST_AUTH"] === "1") {
+  if (
+    process.env["E2E_TEST_AUTH"] === "1" ||
+    process.env["EVAL_TEST_AUTH"] === "1"
+  ) {
     return fallback;
   }
 

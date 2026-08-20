@@ -44,7 +44,7 @@ import {
   listUploadedDocumentsForConversation,
 } from "@/lib/documents/store";
 import { e2eChatResponse } from "@/lib/e2e/chat";
-import { isE2ETestAuth } from "@/lib/e2e/env";
+import { isE2ETestAuth, skipChatRateLimit } from "@/lib/e2e/env";
 import { langfuseSpanProcessor } from "@/lib/observability/langfuse";
 import { logFailureToLangfuse } from "@/lib/observability/log-failure";
 import {
@@ -91,7 +91,7 @@ export async function POST(req: Request) {
     return new Response("Unauthorized", { status: 401 });
   }
 
-  if (!isE2ETestAuth()) {
+  if (!skipChatRateLimit()) {
     try {
       const { pending } = await enforceChatLimits(userId);
       after(() => pending);
