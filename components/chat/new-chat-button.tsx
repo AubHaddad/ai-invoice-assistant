@@ -12,7 +12,8 @@ export function NewChatButton({ persistedIds }: NewChatButtonProps) {
   const pathname = usePathname();
   const router = useRouter();
   const activeId = pathname.slice(1);
-  const isExistingChat = persistedIds.includes(activeId);
+  const isExistingChat =
+    pathname === "/chats" || persistedIds.includes(activeId);
 
   return (
     <Button
