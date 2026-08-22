@@ -1,11 +1,17 @@
+import { z } from "zod";
 import { getCurrentUserId } from "@/lib/auth/session";
 import {
   getConversationForUser,
   getConversationUsage,
   isUuid,
   listConversationMessages,
+  setConversationPinned,
   toConversationSummary,
 } from "@/lib/chat/store";
+
+const PatchConversationSchema = z.object({
+  pinned: z.boolean(),
+});
 
 export async function GET(
   _req: Request,
@@ -39,4 +45,47 @@ export async function GET(
     messages,
     usage,
   });
+}
+
+export async function PATCH(
+  req: Request,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  const userId = await getCurrentUserId();
+
+  if (!userId) {
+    return new Response("Unauthorized", { status: 401 });
+  }
+
+  const { id } = await params;
+
+  if (!isUuid(id)) {
+    return Response.json({ error: "Invalid conversation id" }, { status: 400 });
+  }
+
+  let json: unknown;
+
+  try {
+    json = await req.json();
+  } catch {
+    return Response.json({ error: "Invalid request" }, { status: 400 });
+  }
+
+  const parsed = PatchConversationSchema.safeParse(json);
+
+  if (!parsed.success) {
+    return Response.json({ error: "Invalid request" }, { status: 400 });
+  }
+
+  const conversation = await setConversationPinned({
+    id,
+    userId,
+    pinned: parsed.data.pinned,
+  });
+
+  if (!conversation) {
+    return Response.json({ error: "Conversation not found" }, { status: 404 });
+  }
+
+  return Response.json({ conversation });
 }

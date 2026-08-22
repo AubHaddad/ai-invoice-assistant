@@ -29,6 +29,7 @@ export function toConversationSummary(
   return {
     id: conversation.id,
     title: conversation.title,
+    pinned: conversation.pinned,
     updatedAt: conversation.updatedAt.toISOString(),
   };
 }
@@ -38,7 +39,7 @@ export async function listConversations(userId: string) {
     .select()
     .from(conversations)
     .where(eq(conversations.userId, userId))
-    .orderBy(desc(conversations.updatedAt));
+    .orderBy(desc(conversations.pinned), desc(conversations.updatedAt));
 
   return rows.map(toConversationSummary);
 }
@@ -51,6 +52,24 @@ export async function getConversationForUser(id: string, userId: string) {
     .limit(1);
 
   return conversation ?? null;
+}
+
+export async function setConversationPinned({
+  id,
+  userId,
+  pinned,
+}: {
+  id: string;
+  userId: string;
+  pinned: boolean;
+}) {
+  const [updated] = await db
+    .update(conversations)
+    .set({ pinned })
+    .where(and(eq(conversations.id, id), eq(conversations.userId, userId)))
+    .returning();
+
+  return updated ? toConversationSummary(updated) : null;
 }
 
 export async function getConversationUsage(

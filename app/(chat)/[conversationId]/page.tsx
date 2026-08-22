@@ -1,16 +1,13 @@
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
-import { ChatApp } from "@/components/chat/chat-app";
+import { ChatPanel } from "@/components/chat/chat-panel";
+import { ErrorBoundary } from "@/components/error-boundary";
 import {
-  EMPTY_CONVERSATION_USAGE,
   getConversationForUser,
-  getConversationUsage,
   isUuid,
   listConversationMessages,
-  listConversations,
 } from "@/lib/chat/store";
 import type { InvoiceAssistantUIMessage } from "@/lib/chat/types";
-import type { ConversationSummary, ConversationUsage } from "@/lib/chat/types";
 import { logFailureToLangfuse } from "@/lib/observability/log-failure";
 
 export default async function ConversationPage({
@@ -28,22 +25,16 @@ export default async function ConversationPage({
     redirect("/");
   }
 
-  let conversations: ConversationSummary[] = [];
-  let conversation;
   let initialMessages: InvoiceAssistantUIMessage[] = [];
-  let initialUsage: ConversationUsage = EMPTY_CONVERSATION_USAGE;
 
   try {
-    [conversations, conversation] = await Promise.all([
-      listConversations(session.user.id),
-      getConversationForUser(conversationId, session.user.id),
-    ]);
+    const conversation = await getConversationForUser(
+      conversationId,
+      session.user.id,
+    );
 
     if (conversation) {
-      [initialMessages, initialUsage] = await Promise.all([
-        listConversationMessages(conversationId),
-        getConversationUsage(conversationId),
-      ]);
+      initialMessages = await listConversationMessages(conversationId);
     }
   } catch (error) {
     logFailureToLangfuse({
@@ -55,14 +46,12 @@ export default async function ConversationPage({
   }
 
   return (
-    <ChatApp
-      key={conversationId}
-      user={session.user}
-      conversationId={conversationId}
-      initialConversations={conversations}
-      initialMessages={initialMessages}
-      initialUsage={initialUsage}
-      showCostBadge={process.env.NODE_ENV !== "production"}
-    />
+    <ErrorBoundary>
+      <ChatPanel
+        key={conversationId}
+        conversationId={conversationId}
+        initialMessages={initialMessages}
+      />
+    </ErrorBoundary>
   );
 }

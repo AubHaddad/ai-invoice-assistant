@@ -1,5 +1,6 @@
 import type { AdapterAccountType } from "next-auth/adapters";
 import {
+  boolean,
   date,
   index,
   integer,
@@ -85,6 +86,7 @@ export const conversations = snakeCase.table(
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
     title: text(),
+    pinned: boolean().notNull().default(false),
     ...timestamps,
   },
   (table) => [index("conversations_user_id_idx").on(table.userId)],
