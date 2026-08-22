@@ -22,6 +22,7 @@ import type {
 export type ConversationSummary = {
   id: string;
   title: string | null;
+  pinned: boolean;
   updatedAt: string;
 };
 

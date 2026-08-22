@@ -9,6 +9,7 @@ import {
   SquareIcon,
   XIcon,
 } from "lucide-react";
+import { useRouter } from "next/navigation";
 import {
   useEffect,
   useRef,
@@ -21,6 +22,7 @@ import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { ComposerUploads } from "@/components/chat/composer-uploads";
 import { useComposerUploads } from "@/components/chat/use-composer-uploads";
+import { notifyConversationUpdated } from "@/components/chat/cost-badge";
 import { InvoiceReviewCard } from "@/components/chat/invoice-review-card";
 import { ToolPart, isRenderableToolPart, type ExtractInvoiceToolPart } from "@/components/chat/tool-part";
 import { Button } from "@/components/ui/button";
@@ -104,14 +106,13 @@ function latestSuccessfulExtract(messages: InvoiceAssistantUIMessage[]) {
 type ChatPanelProps = {
   conversationId: string;
   initialMessages?: InvoiceAssistantUIMessage[];
-  onConversationUpdated?: () => void;
 };
 
 export function ChatPanel({
   conversationId,
   initialMessages,
-  onConversationUpdated,
 }: ChatPanelProps) {
+  const router = useRouter();
   const [input, setInput] = useState("");
   const [transport] = useState(
     () =>
@@ -133,7 +134,8 @@ export function ChatPanel({
       generateId: createUuid,
       transport,
       onFinish: () => {
-        onConversationUpdated?.();
+        router.refresh();
+        notifyConversationUpdated();
       },
     });
 
