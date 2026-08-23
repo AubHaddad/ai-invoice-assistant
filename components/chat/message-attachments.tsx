@@ -1,4 +1,12 @@
 import { FileTextIcon, ImageIcon } from "lucide-react";
+import { DocumentPreviewContent } from "@/components/chat/document-preview-panel";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
 import { formatFileSize } from "@/lib/documents/constants";
 import type { MessageAttachment } from "@/lib/chat/types";
 import { cn } from "@/lib/utils";
@@ -10,7 +18,7 @@ export function MessageAttachments({
 }: {
   attachments: MessageAttachment[];
   selectedDocumentId?: string;
-  onSelect: (attachment: MessageAttachment) => void;
+  onSelect: (attachment: MessageAttachment | null) => void;
 }) {
   if (attachments.length === 0) {
     return null;
@@ -23,29 +31,49 @@ export function MessageAttachments({
 
         return (
           <li key={file.documentId} data-testid="message-attachment">
-            <button
-              type="button"
-              onClick={() => onSelect(file)}
-              aria-label={`View ${file.fileName}`}
-              aria-pressed={selected}
-              className={cn(
-                "flex max-w-full items-center gap-2 rounded-2xl border bg-background px-2.5 py-1.5 text-left text-foreground shadow-sm",
-                "hover:bg-muted",
-                selected && "border-primary ring-2 ring-primary/20",
-              )}
+            <Sheet
+              open={selected}
+              onOpenChange={(open) => onSelect(open ? file : null)}
             >
-              {file.mimeType.startsWith("image/") ? (
-                <ImageIcon className="size-4 shrink-0 text-muted-foreground" />
-              ) : (
-                <FileTextIcon className="size-4 shrink-0 text-muted-foreground" />
-              )}
-              <span className="min-w-0 truncate text-sm font-medium">
-                {file.fileName}
-              </span>
-              <span className="shrink-0 text-xs text-muted-foreground">
-                {formatFileSize(file.sizeBytes)}
-              </span>
-            </button>
+              <SheetTrigger asChild>
+                <button
+                  type="button"
+                  aria-label={`View ${file.fileName}`}
+                  aria-pressed={selected}
+                  className={cn(
+                    "flex max-w-full items-center gap-2 rounded-2xl border bg-background px-2.5 py-1.5 text-left text-foreground shadow-sm",
+                    "hover:bg-muted",
+                    selected && "border-primary ring-2 ring-primary/20",
+                  )}
+                >
+                  {file.mimeType.startsWith("image/") ? (
+                    <ImageIcon className="size-4 shrink-0 text-muted-foreground" />
+                  ) : (
+                    <FileTextIcon className="size-4 shrink-0 text-muted-foreground" />
+                  )}
+                  <span className="min-w-0 truncate text-sm font-medium">
+                    {file.fileName}
+                  </span>
+                  <span className="shrink-0 text-xs text-muted-foreground">
+                    {formatFileSize(file.sizeBytes)}
+                  </span>
+                </button>
+              </SheetTrigger>
+              <SheetContent
+                side="right"
+                showCloseButton={false}
+                className="w-full p-0 sm:max-w-3xl"
+              >
+                <SheetTitle className="sr-only">{file.fileName}</SheetTitle>
+                <SheetDescription className="sr-only">
+                  File preview
+                </SheetDescription>
+                <DocumentPreviewContent
+                  attachment={file}
+                  onClose={() => onSelect(null)}
+                />
+              </SheetContent>
+            </Sheet>
           </li>
         );
       })}

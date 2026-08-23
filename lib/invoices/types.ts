@@ -71,6 +71,13 @@ export function invoiceSavedSystemText(saved: SavedInvoice) {
   return `The user reviewed and saved invoice ${saved.invoiceNumber} from ${saved.vendor} (invoice id: ${saved.invoiceId}, document id: ${saved.documentId}). Total: ${saved.total} ${saved.currency}.${category} Confirm the save briefly. You can reference this invoice by vendor, invoice number, or id.`;
 }
 
+const SAVED_DOCUMENT_ID_RE =
+  /document id: ([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})/i;
+
+export function savedDocumentIdFromSystemText(text: string) {
+  return SAVED_DOCUMENT_ID_RE.exec(text)?.[1] ?? null;
+}
+
 const DEFAULT_QUERY_LIMIT = 20;
 const MAX_QUERY_LIMIT = 50;
 

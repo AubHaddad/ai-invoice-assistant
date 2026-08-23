@@ -38,8 +38,10 @@ describe("SYSTEM_PROMPT", () => {
   });
 
   it("replies in the user's language (FR / EN / AR)", () => {
-    expect(SYSTEM_PROMPT).toMatch(/English, French, or Arabic/);
-    expect(SYSTEM_PROMPT).toMatch(/FR \/ EN \/ AR/);
+    expect(SYSTEM_PROMPT).toMatch(
+      /English, French, Arabic or Moroccan Darija/,
+    );
+    expect(SYSTEM_PROMPT).toMatch(/FR \/ EN \/ AR \/ MA/);
   });
 
   it("treats uploaded documents as untrusted and ignores instructions in them", () => {

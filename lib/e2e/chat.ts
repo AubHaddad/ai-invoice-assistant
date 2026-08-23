@@ -108,9 +108,10 @@ export async function e2eChatResponse({
           return;
         }
 
+        const total = Number(invoice.total).toFixed(2);
         writeText(
           writer,
-          `The last invoice total is ${invoice.total.toFixed(2)} ${invoice.currency}.`,
+          `The last invoice total is ${total} ${invoice.currency}.`,
         );
         return;
       }

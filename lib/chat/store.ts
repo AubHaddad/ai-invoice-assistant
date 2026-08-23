@@ -8,7 +8,7 @@ import {
   messages,
   type Conversation,
 } from "@/lib/db/schema";
-import { generateConversationTitle } from "./title";
+import { fallbackTitle } from "./title";
 import type { ConversationSummary, ConversationUsage } from "./types";
 import { EMPTY_CONVERSATION_USAGE } from "./types";
 import { toMessageContent, toUIMessage } from "./ui-message";
@@ -169,7 +169,7 @@ export async function ensureConversation({
     throw new Error("Conversation not found");
   }
 
-  const title = await generateConversationTitle(firstUserText);
+  const title = fallbackTitle(firstUserText);
   const [conversation] = await db
     .insert(conversations)
     .values({ id, userId, title })
