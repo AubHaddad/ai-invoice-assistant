@@ -21,6 +21,8 @@ import {
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { ComposerUploads } from "@/components/chat/composer-uploads";
+import { DocumentPreviewPanel } from "@/components/chat/document-preview-panel";
+import { MessageAttachments } from "@/components/chat/message-attachments";
 import { useComposerUploads } from "@/components/chat/use-composer-uploads";
 import { notifyConversationUpdated } from "@/components/chat/cost-badge";
 import { InvoiceReviewCard } from "@/components/chat/invoice-review-card";
@@ -31,9 +33,16 @@ import {
 } from "@/components/chat/tool-part";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import type { InvoiceAssistantUIMessage } from "@/lib/chat/types";
+import type {
+  InvoiceAssistantUIMessage,
+  MessageAttachment,
+} from "@/lib/chat/types";
 import { getChatErrorBannerMessage } from "@/lib/chat/error-message";
-import { getMessageText } from "@/lib/chat/message-text";
+import {
+  DEFAULT_UPLOAD_USER_TEXT,
+  getMessageAttachments,
+  getMessageText,
+} from "@/lib/chat/message-text";
 import {
   ExtractInvoiceResultSchema,
   invoiceSavedSystemText,
@@ -151,15 +160,28 @@ export function ChatPanel({ conversationId, initialMessages }: ChatPanelProps) {
   const [reviewPart, setReviewPart] = useState<ExtractInvoiceToolPart | null>(
     null,
   );
+  const [previewAttachment, setPreviewAttachment] =
+    useState<MessageAttachment | null>(null);
   const autoOpenedToolCallIdRef = useRef<string | null>(null);
+  const sidePanelOpen = reviewOpen || previewAttachment !== null;
 
   function openReview(part: ExtractInvoiceToolPart) {
+    setPreviewAttachment(null);
     setReviewPart(part);
     setReviewOpen(true);
   }
 
   function closeReview() {
     setReviewOpen(false);
+  }
+
+  function openPreview(attachment: MessageAttachment) {
+    setReviewOpen(false);
+    setPreviewAttachment(attachment);
+  }
+
+  function closePreview() {
+    setPreviewAttachment(null);
   }
 
   function onInvoiceSaved(saved: SavedInvoice) {
@@ -210,15 +232,36 @@ export function ChatPanel({ conversationId, initialMessages }: ChatPanelProps) {
   }, [messages]);
 
   function submit() {
-    const text =
-      input.trim() || (hasUploaded ? "Extract the uploaded invoice." : "");
+    const typed = input.trim();
+    const uploadedFiles = uploads.filter(
+      (
+        item,
+      ): item is (typeof uploads)[number] & {
+        documentId: string;
+      } => item.status === "uploaded" && Boolean(item.documentId),
+    );
+    const text = typed || (uploadedFiles.length > 0 ? DEFAULT_UPLOAD_USER_TEXT : "");
+
     if (!text || status !== "ready") {
       return;
     }
 
     void sendMessage(
-      { text },
-      { body: { documentIds: [...uploadedDocumentIds] } },
+      {
+        parts: [
+          { type: "text", text },
+          ...uploadedFiles.map((file) => ({
+            type: "data-attachment" as const,
+            data: {
+              documentId: file.documentId,
+              fileName: file.fileName,
+              mimeType: file.mimeType,
+              sizeBytes: file.sizeBytes,
+            },
+          })),
+        ],
+      },
+      { body: { documentIds: uploadedFiles.map((file) => file.documentId) } },
     );
     setInput("");
     clearUploaded();
@@ -278,7 +321,7 @@ export function ChatPanel({ conversationId, initialMessages }: ChatPanelProps) {
       <div
         className={cn(
           "min-h-0 w-full flex-1 flex-col",
-          reviewOpen ? "hidden md:flex" : "flex",
+          sidePanelOpen ? "hidden md:flex" : "flex",
         )}
       >
         {error ? (
@@ -322,13 +365,26 @@ export function ChatPanel({ conversationId, initialMessages }: ChatPanelProps) {
                 const isUser = message.role === "user";
 
                 if (isUser) {
+                  const attachments = getMessageAttachments(message);
+                  const text = getMessageText(message);
+
                   return (
-                    <div key={message.id} className="flex w-full justify-end">
-                      <div className="max-w-[85%] rounded-3xl bg-primary px-4 py-2.5 text-primary-foreground">
-                        <p className="whitespace-pre-wrap text-sm leading-relaxed wrap-break-word">
-                          {getMessageText(message)}
-                        </p>
-                      </div>
+                    <div
+                      key={message.id}
+                      className="flex w-full flex-col items-end gap-2"
+                    >
+                      <MessageAttachments
+                        attachments={attachments}
+                        selectedDocumentId={previewAttachment?.documentId}
+                        onSelect={openPreview}
+                      />
+                      {text ? (
+                        <div className="max-w-[85%] rounded-3xl bg-primary px-4 py-2.5 text-primary-foreground">
+                          <p className="whitespace-pre-wrap text-sm leading-relaxed wrap-break-word">
+                            {text}
+                          </p>
+                        </div>
+                      ) : null}
                     </div>
                   );
                 }
@@ -478,7 +534,12 @@ export function ChatPanel({ conversationId, initialMessages }: ChatPanelProps) {
         </form>
       </div>
 
-      {reviewOpen && reviewPart && reviewResult?.success ? (
+      {previewAttachment ? (
+        <DocumentPreviewPanel
+          attachment={previewAttachment}
+          onClose={closePreview}
+        />
+      ) : reviewOpen && reviewPart && reviewResult?.success ? (
         <aside className="flex min-h-0 w-full shrink-0 flex-col border-l bg-background md:w-md">
           <div className="flex items-center justify-between gap-3 border-b px-4 py-3">
             <p className="font-heading text-sm font-medium">Invoice review</p>

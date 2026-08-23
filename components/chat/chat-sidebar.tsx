@@ -59,7 +59,7 @@ export function ChatSidebar({ user }: ChatSidebarProps) {
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <header className="flex shrink-0 items-center gap-2 border-b px-3 py-3">
+      <header className="flex shrink-0 items-center gap-2 px-3 py-3">
         <Image
           src="/logo.png"
           alt=""
@@ -72,8 +72,14 @@ export function ChatSidebar({ user }: ChatSidebarProps) {
         </p>
       </header>
 
+      <div className="shrink-0 px-3 py-3">
+        <NewChatButton
+          persistedIds={conversations.map((conversation) => conversation.id)}
+        />
+      </div>
+
       <section
-        className="shrink-0 border-b px-2 py-3"
+        className="shrink-0 px-2 py-3"
         aria-labelledby="pinned-heading"
       >
         <div className="flex items-center gap-1.5 px-2 pb-2">
@@ -115,11 +121,6 @@ export function ChatSidebar({ user }: ChatSidebarProps) {
               <ListIcon />
             </Link>
           </Button>
-        </div>
-        <div className="shrink-0 px-3 pb-2">
-          <NewChatButton
-            persistedIds={conversations.map((conversation) => conversation.id)}
-          />
         </div>
         <nav
           aria-label="Recent conversations"
