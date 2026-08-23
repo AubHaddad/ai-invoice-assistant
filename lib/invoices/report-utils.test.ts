@@ -5,6 +5,7 @@ import {
   conversionAsOfDate,
   periodRange,
   pickTargetCurrency,
+  reportAsOfDate,
   reportCsvFileName,
   reportToCsv,
 } from "./report-utils";
@@ -28,6 +29,33 @@ describe("periodRange", () => {
     expect(periodRange("year", "2026-08-19")).toEqual({
       dateFrom: "2026-01-01",
       dateTo: "2026-12-31",
+    });
+  });
+
+  it("honors a named year, month, or quarter instead of today", () => {
+    expect(
+      periodRange("year", reportAsOfDate("year", "2026-08-19", { year: 2024 })),
+    ).toEqual({
+      dateFrom: "2024-01-01",
+      dateTo: "2024-12-31",
+    });
+    expect(
+      periodRange(
+        "month",
+        reportAsOfDate("month", "2026-08-19", { year: 2024, month: 6 }),
+      ),
+    ).toEqual({
+      dateFrom: "2024-06-01",
+      dateTo: "2024-06-30",
+    });
+    expect(
+      periodRange(
+        "quarter",
+        reportAsOfDate("quarter", "2026-08-19", { year: 2024, quarter: 2 }),
+      ),
+    ).toEqual({
+      dateFrom: "2024-04-01",
+      dateTo: "2024-06-30",
     });
   });
 

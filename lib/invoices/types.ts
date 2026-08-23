@@ -160,8 +160,35 @@ export type ReportGroupBy = z.infer<typeof ReportGroupBySchema>;
 
 export const GenerateReportInputSchema = z.object({
   period: ReportPeriodSchema.describe(
-    "Current calendar window: this month, this quarter, or this year",
+    "month, quarter, or year. Combine with year (and month or quarter) when the user names a specific window such as 2024 or June 2025; otherwise the current calendar window.",
   ),
+  year: z
+    .number()
+    .int()
+    .min(2000)
+    .max(2100)
+    .optional()
+    .describe(
+      "Calendar year for the report. Pass this when the user names a year (e.g. 2024). Defaults to the current year.",
+    ),
+  month: z
+    .number()
+    .int()
+    .min(1)
+    .max(12)
+    .optional()
+    .describe(
+      "Calendar month 1–12. Use with period=month when the user names a month. Defaults to the current month.",
+    ),
+  quarter: z
+    .number()
+    .int()
+    .min(1)
+    .max(4)
+    .optional()
+    .describe(
+      "Calendar quarter 1–4. Use with period=quarter when the user names a quarter. Defaults to the current quarter.",
+    ),
   groupBy: ReportGroupBySchema.default("category").describe(
     "How to break down spend: category or vendor",
   ),

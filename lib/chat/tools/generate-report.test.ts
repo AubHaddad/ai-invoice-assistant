@@ -54,6 +54,13 @@ describe("GenerateReportInputSchema", () => {
     });
     expect(
       GenerateReportInputSchema.parse({
+        period: "year",
+        year: 2024,
+        groupBy: "category",
+      }),
+    ).toMatchObject({ period: "year", year: 2024 });
+    expect(
+      GenerateReportInputSchema.parse({
         period: "quarter",
         groupBy: "vendor",
         currency: "EUR",
@@ -99,6 +106,22 @@ describe("generateReport tool", () => {
       return;
     }
     expect(report.rows[0]).toMatchObject({ key: "software", count: 2 });
+  });
+
+  it("uses a named year instead of the current calendar year", async () => {
+    dbState.groups = [];
+
+    const report = await generateReport({
+      userId: "user-1",
+      filters: { period: "year", year: 2024, groupBy: "category" },
+      now: new Date("2026-08-19T12:00:00.000Z"),
+    });
+
+    expect(report).toMatchObject({
+      period: "year",
+      dateFrom: "2024-01-01",
+      dateTo: "2024-12-31",
+    });
   });
 
   it("passes the signed-in user through the tool execute wrapper", async () => {

@@ -46,6 +46,29 @@ function lastDayOfMonth(year: number, month: number) {
   return new Date(Date.UTC(year, month, 0)).getUTCDate();
 }
 
+export function reportAsOfDate(
+  period: ReportPeriod,
+  today: string,
+  options: { year?: number; month?: number; quarter?: number } = {},
+) {
+  const [currentYear, currentMonth] = today.split("-").map(Number);
+  const year = options.year ?? currentYear;
+
+  if (period === "month") {
+    const month = options.month ?? currentMonth;
+    return isoDate(year, month, 1);
+  }
+
+  if (period === "quarter") {
+    const currentQuarter = Math.floor((currentMonth - 1) / 3) + 1;
+    const quarter = options.quarter ?? currentQuarter;
+    const startMonth = (quarter - 1) * 3 + 1;
+    return isoDate(year, startMonth, 1);
+  }
+
+  return isoDate(year, 1, 1);
+}
+
 export function periodRange(
   period: ReportPeriod,
   asOfDate: string,
