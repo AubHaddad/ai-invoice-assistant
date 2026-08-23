@@ -54,22 +54,54 @@ export async function getConversationForUser(id: string, userId: string) {
   return conversation ?? null;
 }
 
-export async function setConversationPinned({
+export async function updateConversation({
   id,
   userId,
   pinned,
+  title,
 }: {
   id: string;
   userId: string;
-  pinned: boolean;
+  pinned?: boolean;
+  title?: string;
 }) {
+  const values: { pinned?: boolean; title?: string } = {};
+
+  if (pinned !== undefined) {
+    values.pinned = pinned;
+  }
+
+  if (title !== undefined) {
+    values.title = title;
+  }
+
+  if (Object.keys(values).length === 0) {
+    const conversation = await getConversationForUser(id, userId);
+    return conversation ? toConversationSummary(conversation) : null;
+  }
+
   const [updated] = await db
     .update(conversations)
-    .set({ pinned })
+    .set(values)
     .where(and(eq(conversations.id, id), eq(conversations.userId, userId)))
     .returning();
 
   return updated ? toConversationSummary(updated) : null;
+}
+
+export async function deleteConversation({
+  id,
+  userId,
+}: {
+  id: string;
+  userId: string;
+}) {
+  const [deleted] = await db
+    .delete(conversations)
+    .where(and(eq(conversations.id, id), eq(conversations.userId, userId)))
+    .returning({ id: conversations.id });
+
+  return Boolean(deleted);
 }
 
 export async function getConversationUsage(

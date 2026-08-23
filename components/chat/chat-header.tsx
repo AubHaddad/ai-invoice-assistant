@@ -2,14 +2,12 @@
 
 import { usePathname } from "next/navigation";
 import { ConversationCostBadgeLive } from "@/components/chat/cost-badge";
+import { useConversations } from "@/components/chat/conversations-context";
 import { PinConversationButton } from "@/components/chat/pin-conversation-button";
 import type { ConversationSummary } from "@/lib/chat/types";
 
 type ChatHeaderProps = {
-  conversations: ConversationSummary[];
   showCostBadge?: boolean;
-  pendingIds: Record<string, true>;
-  onPinnedChange: (conversationId: string, pinned: boolean) => void;
 };
 
 function conversationTitle(
@@ -25,16 +23,17 @@ function conversationTitle(
   return conversation.title?.trim() || "Untitled";
 }
 
-export function ChatHeader({
-  conversations,
-  showCostBadge = false,
-  pendingIds,
-  onPinnedChange,
-}: ChatHeaderProps) {
+export function ChatHeader({ showCostBadge = false }: ChatHeaderProps) {
   const pathname = usePathname();
+  const { conversations, pendingIds, onPinnedChange } = useConversations();
+  const isAllChats = pathname === "/chats";
   const conversationId = pathname.slice(1);
-  const conversation = conversations.find((item) => item.id === conversationId);
-  const title = conversationTitle(conversations, conversationId);
+  const conversation = isAllChats
+    ? undefined
+    : conversations.find((item) => item.id === conversationId);
+  const title = isAllChats
+    ? "All chats"
+    : conversationTitle(conversations, conversationId);
 
   return (
     <header className="flex items-center justify-between gap-4 border-b px-3 py-3 md:px-4">
@@ -52,7 +51,7 @@ export function ChatHeader({
           />
         ) : null}
       </div>
-      {showCostBadge ? <ConversationCostBadgeLive /> : null}
+      {showCostBadge && !isAllChats ? <ConversationCostBadgeLive /> : null}
     </header>
   );
 }

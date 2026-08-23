@@ -1,8 +1,8 @@
 "use client";
 
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
+import Link from "next/link";
 import { PlusIcon } from "lucide-react";
-import { Button } from "@/components/ui/button";
 
 type NewChatButtonProps = {
   persistedIds: string[];
@@ -10,20 +10,13 @@ type NewChatButtonProps = {
 
 export function NewChatButton({ persistedIds }: NewChatButtonProps) {
   const pathname = usePathname();
-  const router = useRouter();
   const activeId = pathname.slice(1);
-  const isExistingChat = persistedIds.includes(activeId);
+  const href = pathname === "/chats" || persistedIds.includes(activeId) ? `/${crypto.randomUUID()}` : pathname;
 
   return (
-    <Button
-      className="w-full"
-      onClick={() => {
-        router.push(`/${crypto.randomUUID()}`);
-      }}
-      disabled={!isExistingChat}
-    >
-      <PlusIcon />
+    <Link href={href} className="w-full hover:bg-muted flex gap-2 items-center cursor-pointer p-2 rounded-md  text-sm font-medium whitespace-nowrap">
+      <PlusIcon className="size-5" />
       New chat
-    </Button>
+    </Link>
   );
 }

@@ -71,9 +71,20 @@ export type InvoiceAssistantTools = {
   };
 };
 
+export type MessageAttachment = {
+  documentId: string;
+  fileName: string;
+  mimeType: string;
+  sizeBytes: number;
+};
+
+export type InvoiceAssistantDataParts = {
+  attachment: MessageAttachment;
+};
+
 export type InvoiceAssistantUIMessage = UIMessage<
   never,
-  never,
+  InvoiceAssistantDataParts,
   InvoiceAssistantTools
 >;
 
