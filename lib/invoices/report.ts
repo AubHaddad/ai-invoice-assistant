@@ -9,6 +9,7 @@ import {
   buildReportResult,
   conversionAsOfDate,
   periodRange,
+  reportAsOfDate,
 } from "./report-utils";
 import {
   GenerateReportInputSchema,
@@ -92,7 +93,14 @@ export async function generateReport({
 }): Promise<GenerateReportResult | { error: string }> {
   const input = GenerateReportInputSchema.parse(filters);
   const today = todayIsoDate(now);
-  const { dateFrom, dateTo } = periodRange(input.period, today);
+  const { dateFrom, dateTo } = periodRange(
+    input.period,
+    reportAsOfDate(input.period, today, {
+      year: input.year,
+      month: input.month,
+      quarter: input.quarter,
+    }),
+  );
   const asOfDate = conversionAsOfDate(dateTo, today);
   const [groups, rates] = await Promise.all([
     loadReportGroups(userId, input.groupBy, dateFrom, dateTo),
