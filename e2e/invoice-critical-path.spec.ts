@@ -35,8 +35,17 @@ test("upload, save, and recall the last invoice total", async ({ page }) => {
   await expect(page.getByTestId("invoice-card")).toContainText("Acme Corp");
   await expect(page.getByTestId("invoice-card")).toContainText(/100/);
 
+  const reviewHeading = page.getByRole("heading", { name: "Invoice review" });
+  if (!(await reviewHeading.isVisible())) {
+    await page.getByRole("button", { name: "Review" }).click();
+  }
+  await expect(reviewHeading).toBeVisible();
+
   await page.getByRole("button", { name: "Save" }).click();
   await expect(page.getByText("Saved", { exact: true })).toBeVisible();
+  await page.getByLabel("Close invoice review").click();
+  await expect(reviewHeading).toBeHidden();
+
   await expect(page.getByLabel("Send message")).toBeVisible({ timeout: 30_000 });
 
   await page.getByLabel("Chat message").fill(

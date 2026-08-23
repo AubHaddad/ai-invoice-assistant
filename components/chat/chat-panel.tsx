@@ -21,7 +21,6 @@ import {
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { ComposerUploads } from "@/components/chat/composer-uploads";
-import { DocumentPreviewPanel } from "@/components/chat/document-preview-panel";
 import { MessageAttachments } from "@/components/chat/message-attachments";
 import { useComposerUploads } from "@/components/chat/use-composer-uploads";
 import { notifyConversationUpdated } from "@/components/chat/cost-badge";
@@ -32,6 +31,12 @@ import {
   type ExtractInvoiceToolPart,
 } from "@/components/chat/tool-part";
 import { Button } from "@/components/ui/button";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import { Textarea } from "@/components/ui/textarea";
 import type {
   InvoiceAssistantUIMessage,
@@ -46,6 +51,7 @@ import {
 import {
   ExtractInvoiceResultSchema,
   invoiceSavedSystemText,
+  savedDocumentIdFromSystemText,
   type SavedInvoice,
 } from "@/lib/invoices/types";
 import { cn } from "@/lib/utils";
@@ -123,6 +129,52 @@ function latestSuccessfulExtract(messages: InvoiceAssistantUIMessage[]) {
   return null;
 }
 
+function savedDocumentIds(messages: InvoiceAssistantUIMessage[]) {
+  const ids = new Set<string>();
+
+  for (const message of messages) {
+    if (message.role !== "system") {
+      continue;
+    }
+
+    const documentId = savedDocumentIdFromSystemText(getMessageText(message));
+
+    if (documentId) {
+      ids.add(documentId);
+    }
+  }
+
+  return ids;
+}
+
+function extractDocumentId(part: ExtractInvoiceToolPart) {
+  if (part.state !== "output-available") {
+    return null;
+  }
+
+  const parsed = ExtractInvoiceResultSchema.safeParse(part.output);
+
+  if (!parsed.success || !parsed.data.ok) {
+    return null;
+  }
+
+  return parsed.data.documentId;
+}
+
+function shouldAutoOpenExtract(
+  extract: ExtractInvoiceToolPart | null,
+  seenToolCallId: string | null,
+  messages: InvoiceAssistantUIMessage[],
+) {
+  if (!extract || extract.toolCallId === seenToolCallId) {
+    return false;
+  }
+
+  const documentId = extractDocumentId(extract);
+
+  return !(documentId && savedDocumentIds(messages).has(documentId));
+}
+
 type ChatPanelProps = {
   conversationId: string;
   initialMessages?: InvoiceAssistantUIMessage[];
@@ -162,8 +214,18 @@ export function ChatPanel({ conversationId, initialMessages }: ChatPanelProps) {
   );
   const [previewAttachment, setPreviewAttachment] =
     useState<MessageAttachment | null>(null);
-  const autoOpenedToolCallIdRef = useRef<string | null>(null);
-  const sidePanelOpen = reviewOpen || previewAttachment !== null;
+  const [seenExtractId, setSeenExtractId] = useState<string | null>(null);
+  const latestExtract = latestSuccessfulExtract(messages);
+
+  if (latestExtract && latestExtract.toolCallId !== seenExtractId) {
+    setSeenExtractId(latestExtract.toolCallId);
+
+    if (shouldAutoOpenExtract(latestExtract, seenExtractId, messages)) {
+      setPreviewAttachment(null);
+      setReviewPart(latestExtract);
+      setReviewOpen(true);
+    }
+  }
 
   function openReview(part: ExtractInvoiceToolPart) {
     setPreviewAttachment(null);
@@ -219,17 +281,6 @@ export function ChatPanel({ conversationId, initialMessages }: ChatPanelProps) {
 
     list.scrollTop = list.scrollHeight;
   }, [messages, status]);
-
-  useEffect(() => {
-    const latest = latestSuccessfulExtract(messages);
-
-    if (!latest || latest.toolCallId === autoOpenedToolCallIdRef.current) {
-      return;
-    }
-
-    autoOpenedToolCallIdRef.current = latest.toolCallId;
-    openReview(latest);
-  }, [messages]);
 
   function submit() {
     const typed = input.trim();
@@ -317,13 +368,7 @@ export function ChatPanel({ conversationId, initialMessages }: ChatPanelProps) {
       : null;
 
   return (
-    <div className="flex min-h-0 min-w-0 flex-1">
-      <div
-        className={cn(
-          "min-h-0 w-full flex-1 flex-col",
-          sidePanelOpen ? "hidden md:flex" : "flex",
-        )}
-      >
+    <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         {error ? (
           <div
             role="alert"
@@ -346,7 +391,7 @@ export function ChatPanel({ conversationId, initialMessages }: ChatPanelProps) {
           ref={listRef}
           className="flex min-h-0 flex-1 flex-col items-center gap-4 overflow-y-auto px-4 py-6"
         >
-          <div className="flex flex-1 flex-col gap-4 max-w-5xl">
+          <div className="flex flex-1 flex-col gap-4 px-60 w-full">
             {messages.length === 0 ? (
               <div className="flex flex-1 flex-col items-center justify-center px-6 text-center">
                 <h1 className="font-heading text-2xl font-medium tracking-tight">
@@ -376,7 +421,13 @@ export function ChatPanel({ conversationId, initialMessages }: ChatPanelProps) {
                       <MessageAttachments
                         attachments={attachments}
                         selectedDocumentId={previewAttachment?.documentId}
-                        onSelect={openPreview}
+                        onSelect={(file) => {
+                          if (file) {
+                            openPreview(file);
+                          } else {
+                            closePreview();
+                          }
+                        }}
                       />
                       {text ? (
                         <div className="max-w-[85%] rounded-3xl bg-primary px-4 py-2.5 text-primary-foreground">
@@ -532,37 +583,51 @@ export function ChatPanel({ conversationId, initialMessages }: ChatPanelProps) {
             Enter to send · Shift+Enter for a new line · PDF or image
           </p>
         </form>
-      </div>
 
-      {previewAttachment ? (
-        <DocumentPreviewPanel
-          attachment={previewAttachment}
-          onClose={closePreview}
-        />
-      ) : reviewOpen && reviewPart && reviewResult?.success ? (
-        <aside className="flex min-h-0 w-full shrink-0 flex-col border-l bg-background md:w-md">
-          <div className="flex items-center justify-between gap-3 border-b px-4 py-3">
-            <p className="font-heading text-sm font-medium">Invoice review</p>
-            <Button
-              type="button"
-              size="icon-sm"
-              variant="ghost"
-              aria-label="Close invoice review"
-              onClick={closeReview}
-            >
-              <XIcon />
-            </Button>
-          </div>
-          <div className="min-h-0 flex-1 overflow-y-auto p-4">
-            <InvoiceReviewCard
-              key={reviewPart.toolCallId}
-              result={reviewResult.data}
-              conversationId={conversationId}
-              onSaved={onInvoiceSaved}
-              onDiscard={closeReview}
-            />
-          </div>
-        </aside>
+      {reviewOpen && reviewPart && reviewResult?.success ? (
+        <Sheet
+          open
+          onOpenChange={(open) => {
+            if (!open) {
+              closeReview();
+            }
+          }}
+        >
+          <SheetContent
+            side="right"
+            showCloseButton={false}
+            className="w-full p-0 sm:max-w-3xl"
+          >
+            <div className="flex h-full min-h-0 flex-col">
+              <div className="flex items-center justify-between gap-3 border-b px-4 py-3">
+                <SheetTitle className="font-heading text-sm font-medium">
+                  Invoice review
+                </SheetTitle>
+                <SheetDescription className="sr-only">
+                  Review and save the extracted invoice
+                </SheetDescription>
+                <Button
+                  type="button"
+                  size="icon-sm"
+                  variant="ghost"
+                  aria-label="Close invoice review"
+                  onClick={closeReview}
+                >
+                  <XIcon />
+                </Button>
+              </div>
+              <div className="min-h-0 flex-1 overflow-y-auto p-4">
+                <InvoiceReviewCard
+                  key={reviewPart.toolCallId}
+                  result={reviewResult.data}
+                  conversationId={conversationId}
+                  onSaved={onInvoiceSaved}
+                  onDiscard={closeReview}
+                />
+              </div>
+            </div>
+          </SheetContent>
+        </Sheet>
       ) : null}
     </div>
   );

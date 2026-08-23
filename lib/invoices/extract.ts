@@ -300,7 +300,7 @@ async function extractPdfInvoice({
   const sparsePages = textPages.filter((page) => !hasUsableTextLayer(page.text));
   const needsVision = !textIsUsable || sparsePages.length > 0;
 
-  if (textIsUsable && sparsePages.length === 0) {
+  if (!needsVision) {
     const extraction = await extractFromText({
       fileName,
       text: concatenated,

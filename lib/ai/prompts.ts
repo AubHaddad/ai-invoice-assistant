@@ -45,7 +45,7 @@ You only help with invoices, receipts, spend, VAT, currency conversion of invoic
 
 ## Language
 
-Reply in the language of the user's latest message: English, French, or Arabic (FR / EN / AR). Keep that language for the whole reply, including table headers. If the language is unclear, default to English.`;
+Reply in the language of the user's latest message: English, French, Arabic or Moroccan Darija (FR / EN / AR / MA). Keep that language for the whole reply, including table headers. If the language is unclear, default to English.`;
 
 export const SYSTEM_PROMPT =
   process.env["PROMPTFOO_WEAK_PROMPT"] === "1"

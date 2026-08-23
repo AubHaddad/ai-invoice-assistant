@@ -29,7 +29,10 @@ import {
   saveAssistantMessage,
   saveSystemMessage,
   saveUserMessage,
+  updateConversation,
 } from "@/lib/chat/store";
+import { getMessageAttachments } from "@/lib/chat/message-text";
+import { generateConversationTitle } from "@/lib/chat/title";
 import {
   cachedChatInstructions,
   conversationContextMessage,
@@ -130,12 +133,15 @@ export async function POST(req: Request) {
     return Response.json({ error: "A user message is required" }, { status: 400 });
   }
 
+  let conversationCreated = false;
+
   try {
-    await ensureConversation({
+    const { created } = await ensureConversation({
       id: conversationId,
       userId,
       firstUserText: getMessageText(lastUserMessage),
     });
+    conversationCreated = created;
   } catch (error) {
     if (error instanceof Error && error.message === "Conversation not found") {
       return Response.json({ error: "Conversation not found" }, { status: 404 });
@@ -307,6 +313,24 @@ export async function POST(req: Request) {
                 });
               }
 
+              if (conversationCreated && !isContinuation) {
+                try {
+                  await refreshConversationTitle({
+                    conversationId,
+                    userId,
+                    userMessage: lastUserMessage,
+                    assistantMessage: responseMessage,
+                  });
+                } catch (error) {
+                  console.error("Failed to generate conversation title", error);
+                  logFailureToLangfuse({
+                    source: "provider",
+                    error,
+                    extra: { feature: "title" },
+                  });
+                }
+              }
+
               logMessageUsageToLangfuse(cost);
 
               if (tokensUsed > 0) {
@@ -329,4 +353,34 @@ export async function POST(req: Request) {
   } catch (error) {
     return failureResponse(error, { stage: "chat" });
   }
+}
+
+async function refreshConversationTitle({
+  conversationId,
+  userId,
+  userMessage,
+  assistantMessage,
+}: {
+  conversationId: string;
+  userId: string;
+  userMessage: UIMessage;
+  assistantMessage: UIMessage;
+}) {
+  const assistantText = getMessageText(assistantMessage);
+
+  if (!assistantText.trim()) {
+    return;
+  }
+
+  const title = await generateConversationTitle({
+    userText: getMessageText(userMessage),
+    assistantText,
+    fileNames: getMessageAttachments(userMessage).map((file) => file.fileName),
+  });
+
+  await updateConversation({
+    id: conversationId,
+    userId,
+    title,
+  });
 }
